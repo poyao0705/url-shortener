@@ -1,7 +1,7 @@
 import { type FastifyPluginAsync } from "fastify";
 import crypto from "crypto";
 
-const NUM_CHARS_IN_URL = 6;
+const SHORT_URL_LENGTH = 6;
 
 function generateShortUrl(longUrl: string): string {
   // Version 1:
@@ -12,12 +12,12 @@ function generateShortUrl(longUrl: string): string {
   // ).join("");
   // return shortUrl;
 
-  // Version 2:
+  // Version 2: Hash the long URL to generate a short URL
   const shortUrl = crypto
     .createHash("md5")
     .update(longUrl)
     .digest("hex")
-    .slice(0, NUM_CHARS_IN_URL);
+    .slice(0, SHORT_URL_LENGTH);
   return shortUrl;
 }
 
