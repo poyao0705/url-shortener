@@ -13,7 +13,8 @@
     "start": "npm run build:ts && fastify start -l info dist/app.js",
     "build:ts": "npm run clean && tsc",
     "watch:ts": "tsc -w",
-    "dev": "fastify start -w -l info src/app.ts"
+    "dev": "fastify start -w -l info src/app.ts",
+    "contract:emit": "prisma contract emit"
   },
   "keywords": [],
   "author": "",
@@ -21,11 +22,14 @@
   "dependencies": {
     "@fastify/autoload": "^6.0.0",
     "@fastify/sensible": "^6.0.0",
+    "@prisma/orm-postgres": "8.0.0-rc.20",
+    "dotenv": "^18.0.9",
     "fastify": "^5.0.0",
     "fastify-cli": "^8.0.3",
     "fastify-plugin": "^6.0.0"
   },
   "devDependencies": {
+    "@prisma/cli-engine": "0.9.0",
     "@types/node": "^26.0.0",
     "c8": "^12.0.0",
     "concurrently": "^10.0.1",

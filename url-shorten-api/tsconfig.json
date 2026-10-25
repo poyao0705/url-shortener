@@ -3,11 +3,16 @@
     "outDir": "dist",
     "sourceMap": true,    
     "target": "esnext",
-    "module": "nodenext",
+    "module": "preserve",
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
     "verbatimModuleSyntax": true,
-    "erasableSyntaxOnly": true
+    "erasableSyntaxOnly": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "types": [
+      "node"
+    ]
   },
   "include": ["src/**/*.ts"]
 }
