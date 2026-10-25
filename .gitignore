@@ -1,0 +1,4 @@
+.zed
+node_modules
+doc/superpowers
+.DS_Store
