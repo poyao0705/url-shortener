@@ -39,8 +39,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
       reply.status(404).send({ error: "URL not found" });
       return;
     }
-    reply.send("shortened url found!");
-    // reply.redirect(url);
+    reply.redirect(url);
   });
 };
 
