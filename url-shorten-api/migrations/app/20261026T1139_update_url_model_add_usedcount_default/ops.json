@@ -1,0 +1,38 @@
+[
+  {
+    "id": "setDefault.Url.usedCount",
+    "label": "Set default on \"Url\".\"usedCount\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "usedCount",
+        "table": "Url"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"usedCount\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "Url",
+          "usedCount"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"usedCount\" on \"Url\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "set default on \"usedCount\"",
+        "sql": "ALTER TABLE \"public\".\"Url\" ALTER COLUMN \"usedCount\" SET DEFAULT 0"
+      }
+    ],
+    "postcheck": []
+  }
+]

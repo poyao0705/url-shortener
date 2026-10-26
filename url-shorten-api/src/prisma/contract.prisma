@@ -26,5 +26,5 @@ model Url {
   longUrl   String
   uid       String
   createdAt TimestamptzString @default(now())
-  usedCount Int
+  usedCount Int @default(0)
 }
