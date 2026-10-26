@@ -23,6 +23,7 @@
     "@fastify/autoload": "^6.0.0",
     "@fastify/sensible": "^6.0.0",
     "@prisma/orm-postgres": "8.0.0-rc.20",
+    "awilix": "^13.0.5",
     "dotenv": "^18.0.9",
     "fastify": "^5.0.0",
     "fastify-cli": "^8.0.3",

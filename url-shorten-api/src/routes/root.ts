@@ -1,24 +1,8 @@
 import { type FastifyPluginAsync } from "fastify";
-import crypto from "crypto";
+import type { UrlService } from "../services/url.service.js";
 
-const SHORT_URL_LENGTH = 6;
-
-function generateShortUrl(longUrl: string): string {
-  // Version 1:
-  // const charsForUrl = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  // const shortUrl = Array.from(
-  //   { length: 6 },
-  //   () => charsForUrl[Math.floor(Math.random() * charsForUrl.length)],
-  // ).join("");
-  // return shortUrl;
-
-  // Version 2: Hash the long URL to generate a short URL
-  const shortUrl = crypto
-    .createHash("md5")
-    .update(longUrl)
-    .digest("hex")
-    .slice(0, SHORT_URL_LENGTH);
-  return shortUrl;
+interface RootRoutesOptions {
+  urlService: Pick<UrlService, "generateShortUrl">;
 }
 
 const urlMap = new Map<string, string>();
@@ -27,8 +11,11 @@ type UrlRequest = {
   longUrl: string;
 };
 
-const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
-  fastify.get("/", async function (request, reply) {
+const root: FastifyPluginAsync<RootRoutesOptions> = async (
+  fastify,
+  { urlService },
+): Promise<void> => {
+  fastify.get("/", async function () {
     return { root: true };
   });
 
@@ -46,7 +33,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
   // Solution: retry when collision occurs. Only if multiple retries happen then add one character space in the short URL
   fastify.post("/shorten", async (request, reply) => {
     const { longUrl } = request.body as UrlRequest;
-    const shortUrl = generateShortUrl(longUrl);
+    const shortUrl = urlService.generateShortUrl(longUrl);
     // record the original url to the database
     // use the urlMap to store the short URL and original URL instead for now
     urlMap.set(shortUrl, longUrl);

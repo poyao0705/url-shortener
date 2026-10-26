@@ -6,7 +6,11 @@ import contractJson from './contract.json' with { type: 'json' };
 
 export const contract = contractFromJson<Contract>(contractJson);
 
-export const db = postgres({
-  contract,
-  url: process.env['DATABASE_URL']!,
-});
+export function createDb() {
+  return postgres({
+    contract,
+    url: process.env['DATABASE_URL']!,
+  });
+}
+
+export type Database = ReturnType<typeof createDb>;
