@@ -15,18 +15,22 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
 ): Promise<void> => {
   fastify.get("/", async () => ({ root: true }));
 
-  // Post method to shorten a URL
-  //
-  // Functional Requirement: generate unique short URL
-  // Design choices 1:
-  // Counter (A separate cache to serve as a unique id incrementer)
-  // Drawback: introduce a single point of failure (the counter cache)
-  // Solution: add another multiple cache service (need to handle concurrency)
-  //
-  // Design choices 2 (V):
-  // Randomly generate short URL
-  // Drawback: high collision rate (same URL can map to different short URLs)
-  // Solution: retry when collision occurs. Only if multiple retries happen then add one character space in the short URL
+  /**
+   * Shortens a URL, persists its mapping, and returns the full short URL.
+   *
+   * Requirement: generate a unique short code.
+   *
+   * Design choices:
+   * 1. Counter-backed IDs: use a dedicated cache as a unique ID incrementer.
+   *    - Drawback: the counter cache is a single point of failure.
+   *    - Mitigation: multiple cache instances with concurrency coordination.
+   * 2. Generated codes (selected): random generation was considered; the current
+   *    service hashes the URL and a retry suffix.
+   *    - Trade-offs: codes can collide, and retries can generate different
+   *      candidates for the same URL.
+   *    - Mitigation: retry collisions and increase the code length after
+   *      repeated failed attempts.
+   */
   fastify.post("/shorten", async (request, reply) => {
     try {
       const { longUrl } = z.object({ longUrl: z.string() }).parse(request.body);
@@ -47,13 +51,15 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
     }
   });
 
-  // Get method do redirect
-  //
-  // Requirement: How to handle high traffic
-  // Design choice 1:
-  // Use db replicas
-  // Design choice 2:
-  // Use Redis cache to reduce database load
+  /**
+   * Resolves a short code and redirects to its original URL.
+   *
+   * Requirement: serve redirects under high traffic.
+   *
+   * Scaling design choices:
+   * 1. Database read replicas to distribute read traffic.
+   * 2. Redis caching to reduce database load.
+   */
   fastify.get("/:shortUrl", async (request, reply) => {
     try {
       const { shortUrl } = z.object({ shortUrl: z.string() }).parse(request.params);
