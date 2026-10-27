@@ -18,24 +18,6 @@ export class UrlService {
     this.db = database;
   }
 
-  //   generateShortUrl(longUrl: string): string {
-  //     // Version 1:
-  //     // const charsForUrl = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  //     // const shortUrl = Array.from(
-  //     //   { length: 6 },
-  //     //   () => charsForUrl[Math.floor(Math.random() * charsForUrl.length)],
-  //     // ).join("");
-  //     // return shortUrl;
-  //
-  //     // Version 2: Hash the long URL to generate a short URL
-  //     const shortUrl = crypto
-  //       .createHash("md5")
-  //       .update(longUrl)
-  //       .digest("hex")
-  //       .slice(0, SHORT_URL_LENGTH);
-  //     return shortUrl;
-  //   }
-  //
   async shortenUrl(longUrl: string): Promise<string> {
     let retry = 0;
     let totalRetries = 0;
@@ -77,44 +59,21 @@ export class UrlService {
         totalRetries++;
       }
       if (totalRetries === MAX_RETRIES) {
-        throw new Error("Failed to shorten URL");
+        throw new Error(errorMessages.FAILED_TO_SHORTEN_URL);
       }
       // if we've retried too many times, increase the short URL length and reset the retry counter
       if (retry === PER_LENGTH_RETRIES) {
-        // throw new Error("Failed to shorten URL");
         shortUrlLength += 1;
         retry = 0;
       }
     }
-    throw new Error("Failed to shorten URL");
-
-    // try {
-    //   // query the database to check if the short URL already exists
-    //   while (retry < MAX_RETRIES) {
-    //     const shortUrl = generateShortUrl(`${longUrl}-${retry}`, shortUrlLength);
-    //     const existingUrl = await this.db.url.findUnique({
-    //       where: { shortUrl },
-    //     });
-    //     if (!existingUrl) {
-    //       // return shortUrl;
-    //       await this.db.url.create({
-    //         data: { shortUrl, longUrl },
-    //       });
-    //       return shortUrl;
-    //     }
-    //     retry++;
-    //
-    //   }
-    //
-    // } catch (error) {
-    //   throw new Error("Failed to shorten URL");
-    // }
+    throw new Error(errorMessages.FAILED_TO_SHORTEN_URL);
   }
 
   async resolveUrl(shortUrl: string): Promise<string> {
     const url = await this.db.orm.public.Url.where({ shortUrl: shortUrl }).first();
     if (!url) {
-      throw new Error("URL not found");
+      throw new Error(errorMessages.URL_NOT_FOUND);
     }
     return url.longUrl;
   }

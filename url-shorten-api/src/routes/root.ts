@@ -28,14 +28,11 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
   // Drawback: high collision rate (same URL can map to different short URLs)
   // Solution: retry when collision occurs. Only if multiple retries happen then add one character space in the short URL
   fastify.post("/shorten", async (request, reply) => {
-    // const { longUrl } = request.body as UrlRequest;
     try {
       const { longUrl } = z.object({ longUrl: z.string() }).parse(request.body);
 
       const shortUrl = await urlService.shortenUrl(longUrl);
       // record the original url to the database
-      // use the urlMap to store the short URL and original URL instead for now
-      // urlMap.set(shortUrl, longUrl);
       // append the short URL to the base URL
       const respUrl = `${request.protocol}://${request.host}/${shortUrl}`;
       reply.send({ respUrl });
@@ -58,7 +55,6 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
   // Design choice 2:
   // Use Redis cache to reduce database load
   fastify.get("/:shortUrl", async (request, reply) => {
-    // const { shortUrl } = request.params as { shortUrl: string };
     try {
       const { shortUrl } = z.object({ shortUrl: z.string() }).parse(request.params);
       const url = await urlService.resolveUrl(shortUrl);
