@@ -6,15 +6,13 @@ import { UrlService } from "../../src/services/url.service.js";
 
 test("apps close only their own database client", async (t) => {
   const clients: Database[] = [];
-  const generateShortUrl = UrlService.prototype.generateShortUrl;
-
-  // The service does not query the database yet, so capture its injected client.
+  // Capture each app's client without executing database queries.
   t.mock.method(
     UrlService.prototype,
-    "generateShortUrl",
-    function (this: UrlService, longUrl: string) {
+    "shortenUrl",
+    async function (this: UrlService) {
       clients.push(Reflect.get(this, "db") as Database);
-      return generateShortUrl.call(this, longUrl);
+      return "test-code";
     },
   );
 
@@ -38,7 +36,10 @@ test("apps close only their own database client", async (t) => {
   const secondClose = t.mock.method(secondClient, "close");
 
   const overriddenApp = await build(t, {
-    urlService: { generateShortUrl: () => "fake-service" },
+    urlService: {
+      shortenUrl: async () => "fake-service",
+      resolveUrl: async () => "https://example.com/fake-service",
+    },
   });
   await overriddenApp.ready();
   await overriddenApp.close();

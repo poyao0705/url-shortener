@@ -2,7 +2,8 @@ import crypto from "crypto";
 import type { Database } from "../prisma/db.js";
 
 const SHORT_URL_LENGTH = 6;
-const MAX_RETRIES = 3;
+const PER_LENGTH_RETRIES = 3;
+const MAX_RETRIES = PER_LENGTH_RETRIES * 3;
 
 export function generateShortUrl(longUrl: string, length: number): string {
   const shortUrl = crypto.createHash("md5").update(longUrl).digest("hex").slice(0, length);
@@ -36,6 +37,7 @@ export class UrlService {
   //
   async shortenUrl(longUrl: string): Promise<string> {
     let retry = 0;
+    let totalRetries = 0;
     let shortUrlLength = SHORT_URL_LENGTH;
 
     // Check if the URL already exists in the database
@@ -46,7 +48,7 @@ export class UrlService {
       throw new Error("URL already exists");
     }
 
-    while (retry < MAX_RETRIES) {
+    while (totalRetries < MAX_RETRIES) {
       try {
         const shortUrl = generateShortUrl(`${longUrl}-${retry}`, shortUrlLength);
         await this.db.orm.public.Url.create({
@@ -61,16 +63,20 @@ export class UrlService {
         if ((error as { sqlState?: string }).sqlState === "23505") {
           // The short URL already exists, try again with different suffix
           retry++;
+          totalRetries++;
         }
       }
+      if (totalRetries === MAX_RETRIES) {
+        throw new Error("Failed to shorten URL");
+      }
       // if we've retried too many times, increase the short URL length and reset the retry counter
-      if (retry === MAX_RETRIES) {
+      if (retry === PER_LENGTH_RETRIES) {
         // throw new Error("Failed to shorten URL");
         shortUrlLength += 1;
         retry = 0;
       }
-      throw new Error("Failed to shorten URL");
     }
+    throw new Error("Failed to shorten URL");
 
     // try {
     //   // query the database to check if the short URL already exists

@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import * as assert from "node:assert";
+import { randomUUID } from "node:crypto";
+import { createDb } from "../../src/prisma/db.js";
 import { build } from "../helper.js";
 
 test("default root route", async (t) => {
@@ -13,7 +15,15 @@ test("default root route", async (t) => {
 
 test("shortens and redirects with the default URL service", async (t) => {
   const app = await build(t);
-  const longUrl = "https://example.com/default-service";
+  const longUrl = `https://example.com/default-service/${randomUUID()}`;
+  t.after(async () => {
+    const database = createDb();
+    try {
+      await database.orm.public.Url.where({ longUrl }).delete();
+    } finally {
+      await database.close();
+    }
+  });
 
   const res = await app.inject({
     method: "POST",
