@@ -23,7 +23,7 @@
 
 model Url {
   shortUrl  String  @id
-  longUrl   String
+  longUrl   String  @unique
   uid       String
   createdAt TimestamptzString @default(now())
   usedCount Int @default(0)

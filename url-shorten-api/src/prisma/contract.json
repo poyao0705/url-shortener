@@ -126,7 +126,13 @@
                   "shortUrl"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "longUrl"
+                  ]
+                }
+              ]
             }
           }
         },
@@ -134,7 +140,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "fd5023a804ddc1a6268415b1ca190e52b72ed30b5e0d316383c7fc013a27aec9"
+    "storageHash": "3a53cebad9451f5eca813b08c18f1f6bd6a97d45c0fb2446accb8e7634e89f24"
   },
   "capabilities": {
     "postgres": {
