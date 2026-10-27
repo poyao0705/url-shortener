@@ -1,6 +1,6 @@
 import crypto from "crypto";
-import { errorMessages } from "../constants.js";
-import type { Database } from "../prisma/db.js";
+import { errorMessages } from "../constants.ts";
+import type { Database } from "../prisma/db.ts";
 
 const SHORT_URL_LENGTH = 6;
 const PER_LENGTH_RETRIES = 3;
