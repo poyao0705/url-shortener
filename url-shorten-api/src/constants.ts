@@ -1,2 +1,7 @@
-export const ERR_MSG_URL_ALREADY_EXISTS = "URL already exists";
-export const ERR_MSG_URL_NOT_FOUND = "URL not found";
+export const errorMessages = {
+  URL_ALREADY_EXISTS: "URL already exists",
+  URL_NOT_FOUND: "URL not found",
+  INTERNAL_SERVER_ERROR: "Internal server error",
+  INVALID_REQUEST_BODY: "Invalid request body",
+  FAILED_TO_SHORTEN_URL: "Failed to shorten URL",
+};

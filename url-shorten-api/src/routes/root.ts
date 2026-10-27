@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { ZodError, z } from "zod";
-import { ERR_MSG_URL_ALREADY_EXISTS, ERR_MSG_URL_NOT_FOUND } from "../constants.ts";
+import { errorMessages } from "../constants.ts";
 import type { UrlService } from "../services/url.service.ts";
 
 interface RootRoutesOptions {
@@ -41,11 +41,11 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
       reply.send({ respUrl });
     } catch (error) {
       if (error instanceof ZodError) {
-        reply.status(400).send({ error: "Invalid request body" });
-      } else if (error instanceof Error && ERR_MSG_URL_ALREADY_EXISTS === error.message) {
-        reply.status(409).send({ error: error.message });
+        reply.status(400).send({ error: errorMessages.INVALID_REQUEST_BODY });
+      } else if (error instanceof Error && errorMessages.URL_ALREADY_EXISTS === error.message) {
+        reply.status(409).send({ error: errorMessages.URL_ALREADY_EXISTS });
       } else {
-        reply.status(500).send({ error: "Internal server error" });
+        reply.status(500).send({ error: errorMessages.INTERNAL_SERVER_ERROR });
       }
     }
   });
@@ -63,16 +63,16 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
       const { shortUrl } = z.object({ shortUrl: z.string() }).parse(request.params);
       const url = await urlService.resolveUrl(shortUrl);
       if (!url) {
-        throw new Error(ERR_MSG_URL_NOT_FOUND);
+        throw new Error(errorMessages.URL_NOT_FOUND);
       }
       reply.redirect(url);
     } catch (error) {
       if (error instanceof ZodError) {
-        reply.status(400).send({ error: "Invalid request body" });
-      } else if (error instanceof Error && ERR_MSG_URL_NOT_FOUND === error.message) {
-        reply.status(404).send({ error: "URL not found" });
+        reply.status(400).send({ error: errorMessages.INVALID_REQUEST_BODY });
+      } else if (error instanceof Error && errorMessages.URL_NOT_FOUND === error.message) {
+        reply.status(404).send({ error: errorMessages.URL_NOT_FOUND });
       } else {
-        reply.status(500).send({ error: "Internal server error" });
+        reply.status(500).send({ error: errorMessages.INTERNAL_SERVER_ERROR });
       }
     }
   });

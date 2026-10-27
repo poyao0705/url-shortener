@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { errorMessages } from "../constants.js";
 import type { Database } from "../prisma/db.js";
 
 const SHORT_URL_LENGTH = 6;
@@ -45,7 +46,7 @@ export class UrlService {
       longUrl: longUrl,
     }).first();
     if (existingUrl) {
-      throw new Error("URL already exists");
+      throw new Error(errorMessages.URL_ALREADY_EXISTS);
     }
 
     while (totalRetries < MAX_RETRIES) {
@@ -58,13 +59,22 @@ export class UrlService {
         });
         return shortUrl;
       } catch (error) {
-        // if (error instanceof )
-        // throw new Error("Failed to shorten URL");
-        if ((error as { sqlState?: string }).sqlState === "23505") {
-          // The short URL already exists, try again with different suffix
-          retry++;
-          totalRetries++;
+        if (
+          !(error instanceof Error) ||
+          !("sqlState" in error) ||
+          error.sqlState !== "23505" ||
+          !("constraint" in error)
+        ) {
+          throw error;
         }
+        if (error.constraint === "Url_longUrl_key") {
+          throw new Error(errorMessages.URL_ALREADY_EXISTS);
+        }
+        if (error.constraint !== "Url_pkey") {
+          throw error;
+        }
+        retry++;
+        totalRetries++;
       }
       if (totalRetries === MAX_RETRIES) {
         throw new Error("Failed to shorten URL");
