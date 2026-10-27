@@ -59,16 +59,17 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
   // Use Redis cache to reduce database load
   fastify.get("/:shortUrl", async (request, reply) => {
     // const { shortUrl } = request.params as { shortUrl: string };
-    const { shortUrl } = z.object({ shortUrl: z.string() }).parse(request.params);
-
     try {
+      const { shortUrl } = z.object({ shortUrl: z.string() }).parse(request.params);
       const url = await urlService.resolveUrl(shortUrl);
       if (!url) {
         throw new Error(ERR_MSG_URL_NOT_FOUND);
       }
       reply.redirect(url);
     } catch (error) {
-      if (error instanceof Error && ERR_MSG_URL_NOT_FOUND === error.message) {
+      if (error instanceof ZodError) {
+        reply.status(400).send({ error: "Invalid request body" });
+      } else if (error instanceof Error && ERR_MSG_URL_NOT_FOUND === error.message) {
         reply.status(404).send({ error: "URL not found" });
       } else {
         reply.status(500).send({ error: "Internal server error" });
