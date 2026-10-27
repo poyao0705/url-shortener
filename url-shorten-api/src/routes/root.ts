@@ -1,5 +1,6 @@
 import { type FastifyPluginAsync } from "fastify";
 import type { UrlService } from "../services/url.service.js";
+import { z, ZodError } from "zod";
 
 interface RootRoutesOptions {
   urlService: Pick<UrlService, "generateShortUrl">;
@@ -7,9 +8,6 @@ interface RootRoutesOptions {
 
 const urlMap = new Map<string, string>();
 
-type UrlRequest = {
-  longUrl: string;
-};
 
 const root: FastifyPluginAsync<RootRoutesOptions> = async (
   fastify,
@@ -32,14 +30,24 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
   // Drawback: high collision rate (same URL can map to different short URLs)
   // Solution: retry when collision occurs. Only if multiple retries happen then add one character space in the short URL
   fastify.post("/shorten", async (request, reply) => {
-    const { longUrl } = request.body as UrlRequest;
-    const shortUrl = urlService.generateShortUrl(longUrl);
-    // record the original url to the database
-    // use the urlMap to store the short URL and original URL instead for now
-    urlMap.set(shortUrl, longUrl);
-    // append the short URL to the base URL
-    const respUrl = `${request.protocol}://${request.host}/${shortUrl}`;
-    reply.send({ respUrl });
+    // const { longUrl } = request.body as UrlRequest;
+    try {
+      const { longUrl } = z.object({ longUrl: z.string() }).parse(request.body);
+
+      const shortUrl = urlService.generateShortUrl(longUrl);
+      // record the original url to the database
+      // use the urlMap to store the short URL and original URL instead for now
+      urlMap.set(shortUrl, longUrl);
+      // append the short URL to the base URL
+      const respUrl = `${request.protocol}://${request.host}/${shortUrl}`;
+      reply.send({ respUrl });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        reply.status(400).send({ error: "Invalid request body" });
+      } else {
+        reply.status(500).send({ error: "Internal server error" });
+      }
+    }
   });
 
   // Get method do redirect
