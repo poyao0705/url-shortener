@@ -1,20 +1,19 @@
-import { type FastifyPluginAsync } from "fastify";
-import type { UrlService } from "../services/url.service.js";
-import { z, ZodError } from "zod";
+import type { FastifyPluginAsync } from "fastify";
+import { ZodError, z } from "zod";
+import { ERR_MSG_URL_ALREADY_EXISTS, ERR_MSG_URL_NOT_FOUND } from "../constants.ts";
+import type { UrlService } from "../services/url.service.ts";
 
 interface RootRoutesOptions {
-  urlService: Pick<UrlService, "shortenUrl">;
+  urlService: Pick<UrlService, "shortenUrl" | "resolveUrl">;
 }
 
-const urlMap = new Map<string, string>();
+// const urlMap = new Map<string, string>();
 
 const root: FastifyPluginAsync<RootRoutesOptions> = async (
   fastify,
   { urlService },
 ): Promise<void> => {
-  fastify.get("/", async function () {
-    return { root: true };
-  });
+  fastify.get("/", async () => ({ root: true }));
 
   // Post method to shorten a URL
   //
@@ -33,16 +32,18 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
     try {
       const { longUrl } = z.object({ longUrl: z.string() }).parse(request.body);
 
-      const shortUrl = urlService.shortenUrl(longUrl);
+      const shortUrl = await urlService.shortenUrl(longUrl);
       // record the original url to the database
       // use the urlMap to store the short URL and original URL instead for now
-      urlMap.set(shortUrl, longUrl);
+      // urlMap.set(shortUrl, longUrl);
       // append the short URL to the base URL
       const respUrl = `${request.protocol}://${request.host}/${shortUrl}`;
       reply.send({ respUrl });
     } catch (error) {
       if (error instanceof ZodError) {
         reply.status(400).send({ error: "Invalid request body" });
+      } else if (error instanceof Error && ERR_MSG_URL_ALREADY_EXISTS === error.message) {
+        reply.status(409).send({ error: error.message });
       } else {
         reply.status(500).send({ error: "Internal server error" });
       }
@@ -57,13 +58,22 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
   // Design choice 2:
   // Use Redis cache to reduce database load
   fastify.get("/:shortUrl", async (request, reply) => {
-    const { shortUrl } = request.params as { shortUrl: string };
-    const url = urlMap.get(shortUrl); // query the database for the URL
-    if (!url) {
-      reply.status(404).send({ error: "URL not found" });
-      return;
+    // const { shortUrl } = request.params as { shortUrl: string };
+    const { shortUrl } = z.object({ shortUrl: z.string() }).parse(request.params);
+
+    try {
+      const url = await urlService.resolveUrl(shortUrl);
+      if (!url) {
+        throw new Error(ERR_MSG_URL_NOT_FOUND);
+      }
+      reply.redirect(url);
+    } catch (error) {
+      if (error instanceof Error && ERR_MSG_URL_NOT_FOUND === error.message) {
+        reply.status(404).send({ error: "URL not found" });
+      } else {
+        reply.status(500).send({ error: "Internal server error" });
+      }
     }
-    reply.redirect(url);
   });
 };
 

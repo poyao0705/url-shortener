@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export type AppOptions = {
-  urlService?: Pick<UrlService, "shortenUrl">;
+  urlService?: Pick<UrlService, "shortenUrl" | "resolveUrl">;
 } & Partial<AutoloadPluginOptions>;
 
 // Pass --options via CLI arguments in command to enable these options.
