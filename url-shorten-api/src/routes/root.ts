@@ -3,11 +3,10 @@ import type { UrlService } from "../services/url.service.js";
 import { z, ZodError } from "zod";
 
 interface RootRoutesOptions {
-  urlService: Pick<UrlService, "generateShortUrl">;
+  urlService: Pick<UrlService, "shortenUrl">;
 }
 
 const urlMap = new Map<string, string>();
-
 
 const root: FastifyPluginAsync<RootRoutesOptions> = async (
   fastify,
@@ -34,7 +33,7 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
     try {
       const { longUrl } = z.object({ longUrl: z.string() }).parse(request.body);
 
-      const shortUrl = urlService.generateShortUrl(longUrl);
+      const shortUrl = urlService.shortenUrl(longUrl);
       // record the original url to the database
       // use the urlMap to store the short URL and original URL instead for now
       urlMap.set(shortUrl, longUrl);
