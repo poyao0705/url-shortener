@@ -35,9 +35,13 @@ test("uses the injected URL service when shortening a URL", async (t) => {
   const longUrl = "https://example.com/injected-service";
   const app = await build(t, {
     urlService: {
-      shortenUrl(url: string) {
+      async shortenUrl(url: string) {
         assert.equal(url, longUrl);
         return "di-code";
+      },
+      async resolveUrl(shortUrl: string) {
+        assert.equal(shortUrl, "di-code");
+        return longUrl;
       },
     },
   });
