@@ -10,5 +10,22 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
 
+  redis:
+    image: redis:latest
+    ports:
+      - '127.0.0.1:6379:6379'
+    volumes:
+      - redis-data:/data
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+      - --appendonly
+      - yes
+    # environment:
+    #   - REDIS_ARGS=--requirepass ${REDIS_PASSWORD} --appendonly yes
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  redis-data:
