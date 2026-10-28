@@ -7,7 +7,7 @@ import { createClient } from "redis";
 import { UrlService } from "./services/url.service.ts";
 import { errorMessages } from "./constants.ts";
 
-import { createContainer, InjectionMode, asClass, asFunction } from "awilix";
+import { createContainer, InjectionMode, asClass, asFunction, asValue } from "awilix";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,6 +30,7 @@ const app: FastifyPluginAsync<AppOptions> = async (fastify, opts): Promise<void>
   });
 
   container.register({
+    logger: asValue(fastify.log),
     database: asFunction(createDb)
       .singleton()
       .disposer((database) => database.close()),

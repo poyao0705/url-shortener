@@ -46,6 +46,7 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
       } else if (error instanceof Error && errorMessages.URL_ALREADY_EXISTS === error.message) {
         reply.status(409).send({ error: errorMessages.URL_ALREADY_EXISTS });
       } else {
+        fastify.log.error(error);
         reply.status(500).send({ error: errorMessages.INTERNAL_SERVER_ERROR });
       }
     }
@@ -74,6 +75,7 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
       } else if (error instanceof Error && errorMessages.URL_NOT_FOUND === error.message) {
         reply.status(404).send({ error: errorMessages.URL_NOT_FOUND });
       } else {
+        fastify.log.error(error);
         reply.status(500).send({ error: errorMessages.INTERNAL_SERVER_ERROR });
       }
     }
