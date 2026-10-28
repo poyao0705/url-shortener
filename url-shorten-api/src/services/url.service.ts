@@ -1,6 +1,8 @@
 import crypto from "crypto";
 import { errorMessages } from "../constants.ts";
 import type { Database } from "../prisma/db.ts";
+import { createClient } from "redis";
+import fastify from "fastify";
 
 const SHORT_URL_LENGTH = 6;
 const PER_LENGTH_RETRIES = 3;
@@ -13,6 +15,7 @@ export function generateShortUrl(longUrl: string, length: number): string {
 
 export class UrlService {
   private readonly db: Database;
+  private readonly redisClient: ReturnType<typeof createClient>;
 
   constructor(database: Database) {
     this.db = database;
@@ -71,6 +74,8 @@ export class UrlService {
   }
 
   async resolveUrl(shortUrl: string): Promise<string> {
+    // use node-redis
+
     const url = await this.db.orm.public.Url.where({ shortUrl: shortUrl }).first();
     if (!url) {
       throw new Error(errorMessages.URL_NOT_FOUND);

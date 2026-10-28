@@ -3,7 +3,9 @@ import AutoLoad, { type AutoloadPluginOptions } from "@fastify/autoload";
 import { type FastifyPluginAsync } from "fastify";
 import { fileURLToPath } from "node:url";
 import { createDb } from "./prisma/db.ts";
+import { createClient } from "redis";
 import { UrlService } from "./services/url.service.ts";
+import { errorMessages } from "./constants.ts";
 
 import { createContainer, InjectionMode, asClass, asFunction } from "awilix";
 
@@ -31,8 +33,26 @@ const app: FastifyPluginAsync<AppOptions> = async (fastify, opts): Promise<void>
     database: asFunction(createDb)
       .singleton()
       .disposer((database) => database.close()),
+    redisClient: asFunction(() => {
+      const redisUrl = process.env.REDIS_URL;
+      if (!redisUrl) throw new Error(errorMessages.REDIS_URL_NOT_SET);
+
+      const redisClient = createClient({ url: redisUrl });
+      redisClient.on("error", (err) => {
+        fastify.log.error({ err }, "Redis error");
+      });
+      return redisClient;
+    })
+      .singleton()
+      .disposer((client) => client.quit()),
     urlService: asClass(UrlService).singleton(),
   });
+
+  if (!opts.urlService) {
+    // resolve redisClient first and connect before creating urlService
+    const redisClient = container.resolve<ReturnType<typeof createClient>>("redisClient");
+    await redisClient.connect();
+  }
 
   const urlService = opts.urlService ?? container.resolve<UrlService>("urlService");
 
