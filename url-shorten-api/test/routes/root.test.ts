@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import * as assert from "node:assert";
 import { randomUUID } from "node:crypto";
+import type { FastifyBaseLogger } from "fastify";
+import type { createClient } from "redis";
 import { createDb, type Database } from "../../src/prisma/db.js";
 import { UrlService } from "../../src/services/url.service.js";
 import { build } from "../helper.js";
@@ -79,7 +81,18 @@ test("concurrent registrations of the same URL return 200 and 409", { timeout: 1
       },
     },
   } as unknown as Database;
-  const app = await build(t, { urlService: new UrlService(gatedDatabase) });
+  const cache = new Map<string, string>();
+  const redisClient = {
+    get: async (key: string) => cache.get(key) ?? null,
+    set: async (key: string, value: string) => {
+      cache.set(key, value);
+      return "OK";
+    },
+  } as unknown as ReturnType<typeof createClient>;
+  const logger = { info() {}, warn() {}, error() {} } as unknown as FastifyBaseLogger;
+  const app = await build(t, {
+    urlService: new UrlService(gatedDatabase, redisClient, logger),
+  });
   const register = () => app.inject({
     method: "POST",
     url: "/shorten",
