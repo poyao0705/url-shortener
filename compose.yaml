@@ -3,7 +3,7 @@ services:
     image: postgres:18
     environment:
       POSTGRES_USER: app
-      POSTGRES_PASSWORD: dev_password
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD}
       POSTGRES_DB: url_shortener
     ports:
       - "127.0.0.1:5432:5432"
