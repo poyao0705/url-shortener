@@ -1,13 +1,12 @@
 import * as path from "node:path";
-import AutoLoad, { type AutoloadPluginOptions } from "@fastify/autoload";
-import { type FastifyPluginAsync } from "fastify";
 import { fileURLToPath } from "node:url";
-import { createDb } from "./prisma/db.ts";
+import AutoLoad, { type AutoloadPluginOptions } from "@fastify/autoload";
+import { asClass, asFunction, asValue, createContainer, InjectionMode } from "awilix";
+import type { FastifyPluginAsync } from "fastify";
 import { createClient } from "redis";
-import { UrlService } from "./services/url.service.ts";
 import { errorMessages } from "./constants.ts";
-
-import { createContainer, InjectionMode, asClass, asFunction, asValue } from "awilix";
+import { createDb } from "./prisma/db.ts";
+import { UrlService } from "./services/url.service.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
