@@ -11,6 +11,9 @@ importers:
       '@fastify/autoload':
         specifier: ^6.0.0
         version: 6.5.1
+      '@fastify/awilix':
+        specifier: ^8.3.2
+        version: 8.3.2(awilix@13.0.5)(fastify@5.12.8)
       '@fastify/sensible':
         specifier: ^6.0.0
         version: 6.0.7
@@ -24,8 +27,8 @@ importers:
         specifier: ^18.0.9
         version: 18.0.9
       fastify:
-        specifier: ^5.0.0
-        version: 5.12.7
+        specifier: 5.12.8
+        version: 5.12.8
       fastify-cli:
         specifier: ^8.0.3
         version: 8.0.3
@@ -492,6 +495,12 @@ packages:
 
   '@fastify/autoload@6.5.1':
     resolution: {integrity: sha512-IW2DyejF1+SEEDTwbJriAcKtMcAy+y1cK04ZQj3p7WwwR/zgN+YYxzmM96L+AP48nNOCNKBGpyYJzgZ1HnubKA==}
+
+  '@fastify/awilix@8.3.2':
+    resolution: {integrity: sha512-ANOVy4ax5QYdDbR/p518/HxhOmbyucOC8okwNFl4omzVkBQaNQvZAOtR2HUjacI56v8LlGsqpP1r1tuLiLpa+w==}
+    peerDependencies:
+      awilix: '>=9.0.0'
+      fastify: ^5.0.0
 
   '@fastify/deepmerge@3.2.4':
     resolution: {integrity: sha512-kc8GQq5gX9RRhw0rov3DMrN8wS8yRlxJRdDzsYwwdBV/wazuVgc/1K7CKL90tlvu3RlHan6Y0R0aE3nJtBz2eQ==}
@@ -1425,6 +1434,12 @@ packages:
   avvio@9.3.1:
     resolution: {integrity: sha512-QyTKW61/qlba+cUQBm/sT9X8lri4UdomqSDwCnrnj1IvLVDRRiXRkz4CgBRWB+/cmfC7SK5WQc8T1vSdGvaUcQ==}
 
+  awilix-manager@7.2.0:
+    resolution: {integrity: sha512-mDGekPGrdPQ+KOGoNGilj2SdIEFthfg9QTAbisOQ2+dpG4coFii6GMik5HXmdXl6Z9jhZWYJJTFmNoTFlF1dKw==}
+    engines: {node: '>=22.13'}
+    peerDependencies:
+      awilix: '>=9.0.0'
+
   awilix@13.0.5:
     resolution: {integrity: sha512-ORtca6suBdYA1FyTzqHEZDvEuUwo3lPDDBRm7GrzHgi6STESzJKdBtpqfTzObdMj1NGQUWX6k26E3EbQaGJX5Q==}
     engines: {node: '>=20.0.0'}
@@ -1765,8 +1780,8 @@ packages:
     resolution: {integrity: sha512-TxFM9+MUUM2Ub6chZbP5sPNUFaPWA86kHU0VRd4o9OP6PBP92cj9c4/IEsnLoVHcLgrgXf2GUXWUzkJAO9iKFQ==}
     engines: {node: '>=20.0.0'}
 
-  fastify@5.12.7:
-    resolution: {integrity: sha512-v4pEPsTRPuqlDIYiQFB+BHjVN4SdHX9u0ABk0ZDUKbbdY1vsNryUd1j4Z+jQEZajvYIVk047Kimva9/AJ79GYw==}
+  fastify@5.12.8:
+    resolution: {integrity: sha512-moP8exb2sCHLUbJkwp+I6C0padhy4D8lp0SdmzY7HhSdZuqm7O/u3o2aq7u8okaQ//33QDzj3G/u+FsSdB8Qzw==}
 
   fastq@1.20.3:
     resolution: {integrity: sha512-XKv5nnLs6nLF71NgiKJLIZFLkPyIEuOselLG7ujZnGrRfQK8HpvY+WqKhAJUAdLomwVHErVS4LfxFlPq0/FTAw==}
@@ -3260,6 +3275,13 @@ snapshots:
 
   '@fastify/autoload@6.5.1': {}
 
+  '@fastify/awilix@8.3.2(awilix@13.0.5)(fastify@5.12.8)':
+    dependencies:
+      awilix: 13.0.5
+      awilix-manager: 7.2.0(awilix@13.0.5)
+      fastify: 5.12.8
+      fastify-plugin: 6.0.1
+
   '@fastify/deepmerge@3.2.4': {}
 
   '@fastify/error@4.2.1': {}
@@ -4175,6 +4197,10 @@ snapshots:
       '@fastify/error': 4.2.1
       fastq: 1.20.3
 
+  awilix-manager@7.2.0(awilix@13.0.5):
+    dependencies:
+      awilix: 13.0.5
+
   awilix@13.0.5:
     dependencies:
       fast-glob: 3.3.3
@@ -4500,7 +4526,7 @@ snapshots:
       chokidar: 5.0.0
       close-with-grace: 2.5.0
       commist: 3.2.0
-      fastify: 5.12.7
+      fastify: 5.12.8
       fastify-plugin: 6.0.1
       generify: 4.2.0
       help-me: 5.0.0
@@ -4513,7 +4539,7 @@ snapshots:
 
   fastify-tsconfig@3.0.0: {}
 
-  fastify@5.12.7:
+  fastify@5.12.8:
     dependencies:
       '@fastify/ajv-compiler': 4.0.7
       '@fastify/error': 4.2.1

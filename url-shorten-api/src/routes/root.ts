@@ -3,16 +3,7 @@ import { ZodError, z } from "zod";
 import { errorMessages } from "../constants.ts";
 import type { UrlService } from "../services/url.service.ts";
 
-interface RootRoutesOptions {
-  urlService: Pick<UrlService, "shortenUrl" | "resolveUrl">;
-}
-
-// const urlMap = new Map<string, string>();
-
-const root: FastifyPluginAsync<RootRoutesOptions> = async (
-  fastify,
-  { urlService },
-): Promise<void> => {
+const root: FastifyPluginAsync = async (fastify): Promise<void> => {
   fastify.get("/", async () => ({ root: true }));
 
   /**
@@ -35,6 +26,7 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
     try {
       const { longUrl } = z.object({ longUrl: z.string() }).parse(request.body);
 
+      const urlService = request.diScope.resolve<UrlService>("urlService");
       const shortUrl = await urlService.shortenUrl(longUrl);
       // record the original url to the database
       // append the short URL to the base URL
@@ -64,6 +56,7 @@ const root: FastifyPluginAsync<RootRoutesOptions> = async (
   fastify.get("/:shortUrl", async (request, reply) => {
     try {
       const { shortUrl } = z.object({ shortUrl: z.string() }).parse(request.params);
+      const urlService = request.diScope.resolve<UrlService>("urlService");
       const url = await urlService.resolveUrl(shortUrl);
       if (!url) {
         throw new Error(errorMessages.URL_NOT_FOUND);

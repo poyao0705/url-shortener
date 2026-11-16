@@ -3,6 +3,7 @@ import * as assert from "node:assert";
 import { randomUUID } from "node:crypto";
 import type { FastifyBaseLogger } from "fastify";
 import type { createClient } from "redis";
+import { errorMessages } from "../../src/constants.js";
 import { createDb, type Database } from "../../src/prisma/db.js";
 import { UrlService } from "../../src/services/url.service.js";
 import { build } from "../helper.js";
@@ -110,6 +111,69 @@ test("concurrent registrations of the same URL return 200 and 409", { timeout: 1
   assert.equal(redirect.headers.location, longUrl);
   assert.equal((await register()).statusCode, 409);
 });
+
+test("invalid body returns 400 without calling the injected service", async (t) => {
+  const app = await build(t, {
+    urlService: {
+      shortenUrl: async () => { throw new Error("invalid input reached the service"); },
+      resolveUrl: async () => "https://example.com/unused",
+    },
+  });
+
+  const response = await app.inject({ method: "POST", url: "/shorten", payload: {} });
+  assert.equal(response.statusCode, 400);
+  assert.deepStrictEqual(response.json(), { error: errorMessages.INVALID_REQUEST_BODY });
+});
+
+test("duplicate URL from the injected service returns 409", async (t) => {
+  const app = await build(t, {
+    urlService: {
+      shortenUrl: async () => { throw new Error(errorMessages.URL_ALREADY_EXISTS); },
+      resolveUrl: async () => "https://example.com/unused",
+    },
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/shorten",
+    payload: { longUrl: "https://example.com/duplicate" },
+  });
+  assert.equal(response.statusCode, 409);
+  assert.deepStrictEqual(response.json(), { error: errorMessages.URL_ALREADY_EXISTS });
+});
+
+test("missing URL from the injected service returns 404", async (t) => {
+  const app = await build(t, {
+    urlService: {
+      shortenUrl: async () => "unused-code",
+      resolveUrl: async (shortUrl: string) => {
+        assert.equal(shortUrl, "missing-code");
+        throw new Error(errorMessages.URL_NOT_FOUND);
+      },
+    },
+  });
+
+  const response = await app.inject({ url: "/missing-code" });
+  assert.equal(response.statusCode, 404);
+  assert.deepStrictEqual(response.json(), { error: errorMessages.URL_NOT_FOUND });
+});
+
+for (const method of ["POST", "GET"] as const) {
+  test(`unexpected ${method} service errors return a generic 500`, async (t) => {
+    const app = await build(t, {
+      urlService: {
+        shortenUrl: async () => { throw new Error("private database details"); },
+        resolveUrl: async () => { throw new Error("private cache details"); },
+      },
+    });
+
+    const response = await app.inject(method === "POST"
+      ? { method, url: "/shorten", payload: { longUrl: "https://example.com/unexpected" } }
+      : { method, url: "/unexpected-code" });
+    assert.equal(response.statusCode, 500);
+    assert.deepStrictEqual(response.json(), { error: errorMessages.INTERNAL_SERVER_ERROR });
+  });
+}
 
 test("uses the injected URL service when shortening a URL", async (t) => {
   const longUrl = "https://example.com/injected-service";

@@ -1,6 +1,7 @@
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import AutoLoad, { type AutoloadPluginOptions } from "@fastify/autoload";
+import { fastifyAwilixPlugin } from "@fastify/awilix";
 import { asClass, asFunction, asValue, createContainer, InjectionMode } from "awilix";
 import type { FastifyPluginAsync } from "fastify";
 import { createClient } from "redis";
@@ -24,10 +25,6 @@ const app: FastifyPluginAsync<AppOptions> = async (fastify, opts): Promise<void>
     strict: true,
   });
 
-  void fastify.addHook("onClose", async () => {
-    await container.dispose();
-  });
-
   container.register({
     logger: asValue(fastify.log),
     database: asFunction(createDb)
@@ -45,16 +42,21 @@ const app: FastifyPluginAsync<AppOptions> = async (fastify, opts): Promise<void>
     })
       .singleton()
       .disposer((client) => client.quit()),
-    urlService: asClass(UrlService).singleton(),
+    urlService: opts.urlService
+      ? asValue(opts.urlService)
+      : asClass(UrlService).singleton(),
+  });
+
+  await fastify.register(fastifyAwilixPlugin, {
+    container,
+    disposeOnClose: true,
+    disposeOnResponse: true,
   });
 
   if (!opts.urlService) {
-    // resolve redisClient first and connect before creating urlService
     const redisClient = container.resolve<ReturnType<typeof createClient>>("redisClient");
     await redisClient.connect();
   }
-
-  const urlService = opts.urlService ?? container.resolve<UrlService>("urlService");
 
   // Do not touch the following lines
 
@@ -73,7 +75,7 @@ const app: FastifyPluginAsync<AppOptions> = async (fastify, opts): Promise<void>
   // eslint-disable-next-line no-void
   void fastify.register(AutoLoad, {
     dir: path.join(__dirname, "routes"),
-    options: { ...opts, urlService },
+    options: opts,
     forceESM: true,
   });
 };
