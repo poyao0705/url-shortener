@@ -38,6 +38,27 @@ services:
     #   - REDIS_ARGS=--requirepass ${REDIS_PASSWORD} --appendonly yes
     restart: unless-stopped
 
+
+  redis-queue:
+    image: redis:8.10.3-alpine
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - redis-queue-data:/data
+    command:
+      - redis-server
+      - --requirepass
+      - ${QUEUE_REDIS_PASSWORD:?Set QUEUE_REDIS_PASSWORD}
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - noeviction
+    restart: unless-stopped
+
+
 volumes:
   postgres_data:
   redis-data:
+  redis-queue-data:
