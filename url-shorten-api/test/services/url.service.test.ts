@@ -1,6 +1,6 @@
 import * as assert from "node:assert";
 import { test } from "node:test";
-import type { FastifyBaseLogger } from "fastify";
+import Fastify, { type FastifyBaseLogger } from "fastify";
 import type { createClient } from "redis";
 import { errorMessages } from "../../src/constants.js";
 import type { Database } from "../../src/prisma/db.js";
@@ -14,10 +14,12 @@ function buildService(
     find = async () => null,
     get = async () => null,
     set = async () => "OK",
+    logger = { info() {}, warn() {}, error() {} } as unknown as FastifyBaseLogger,
   }: {
     find?: (filters: { shortUrl?: string; longUrl?: string }) => Promise<UrlRecord | null>;
     get?: (key: string) => Promise<unknown>;
     set?: (key: string, value: string, options: { EX: number }) => Promise<unknown>;
+    logger?: FastifyBaseLogger;
   } = {},
 ) {
   const database = {
@@ -33,7 +35,6 @@ function buildService(
     },
   } as unknown as Database;
   const redisClient = { get, set } as unknown as ReturnType<typeof createClient>;
-  const logger = { info() {}, warn() {}, error() {} } as unknown as FastifyBaseLogger;
   return new UrlService(database, redisClient, logger);
 }
 
@@ -217,17 +218,29 @@ for (const [name, error] of [
     constraint: "Another_key",
   })],
 ] as const) {
-  test(`rethrows ${name} unchanged without retrying`, async () => {
+  test(`logs and rethrows ${name} unchanged without retrying`, async (t) => {
+    const logs: Array<{ err?: { message: string; stack: string } }> = [];
+    const app = Fastify({
+      logger: {
+        stream: {
+          write(line: string) { logs.push(JSON.parse(line)); },
+        },
+      },
+    });
+    t.after(() => app.close());
     let attempts = 0;
     const service = buildService(async () => {
       attempts++;
       if (attempts === 1) throw error;
-    });
+    }, { logger: app.log });
 
     await assert.rejects(
       service.shortenUrl("https://example.com/failure"),
       (caught) => caught === error,
     );
     assert.equal(attempts, 1);
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0]?.err?.message, error.message);
+    assert.equal(logs[0]?.err?.stack, error.stack);
   });
 }

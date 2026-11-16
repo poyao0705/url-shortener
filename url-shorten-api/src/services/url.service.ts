@@ -57,7 +57,7 @@ export class UrlService {
           error.sqlState !== "23505" ||
           !("constraint" in error)
         ) {
-          this.logger.error("Unexpected error");
+          this.logger.error({ err: error }, "Unexpected error");
           throw error;
         }
         if (error.constraint === "Url_longUrl_key") {
@@ -65,7 +65,7 @@ export class UrlService {
           throw new Error(errorMessages.URL_ALREADY_EXISTS);
         }
         if (error.constraint !== "Url_pkey") {
-          this.logger.error("Unexpected error");
+          this.logger.error({ err: error }, "Unexpected error");
           throw error;
         }
         retry++;
