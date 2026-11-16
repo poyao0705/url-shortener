@@ -4,5 +4,7 @@ allowBuilds:
 permissions:
   '@prisma/orm-postgres':
     skills: true
+  msgpackr-extract:
+    build: true
   prisma:
     skills: true
