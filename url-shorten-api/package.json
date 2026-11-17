@@ -14,6 +14,8 @@
     "build:ts": "npm run clean && tsc",
     "watch:ts": "tsc -w",
     "dev": "fastify start -w -l info src/app.ts",
+    "worker:dev": "TS_NODE_TRANSPILE_ONLY=1 node --loader ts-node/esm src/worker.ts",
+    "worker": "node dist/worker.js",
     "contract:emit": "prisma contract emit"
   },
   "keywords": [],
@@ -39,6 +41,7 @@
     "c8": "^12.0.0",
     "concurrently": "^10.0.1",
     "fastify-tsconfig": "^3.0.0",
+    "madr": "4.0.0",
     "prisma": "8.0.0-rc.27",
     "ts-node": "^10.4.0",
     "typescript": "~6.0.2"
