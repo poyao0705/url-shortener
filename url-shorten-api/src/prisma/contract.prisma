@@ -23,8 +23,9 @@
 
 model Url {
   shortUrl  String  @id
-  longUrl   String  @unique
+  longUrl   String
   uid       String
   createdAt TimestamptzString @default(now())
   usedCount Int @default(0)
+  @@unique([longUrl, uid], map: "Url_longUrl_uid_key")
 }

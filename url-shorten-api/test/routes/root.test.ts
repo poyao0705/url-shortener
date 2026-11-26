@@ -38,7 +38,7 @@ test("shortens and redirects with the default URL service", async (t) => {
 
   assert.equal(res.statusCode, 200);
   const { respUrl } = res.json();
-  assert.match(respUrl, /^http:\/\/short\.test\/[0-9a-f]{6}$/);
+  assert.match(respUrl, /^http:\/\/short\.test\/[A-Za-z0-9_-]{6}$/);
 
   const redirect = await app.inject({ url: new URL(respUrl).pathname });
   assert.equal(redirect.statusCode, 302);
@@ -65,7 +65,7 @@ test("concurrent registrations of the same URL return 200 and 409", { timeout: 1
     orm: {
       public: {
         Url: {
-          where(filters: { longUrl?: string; shortUrl?: string }) {
+          where(filters: { longUrl?: string; shortUrl?: string; uid?: string }) {
             return {
               first: async () => {
                 const row = await collection.where(filters).first();

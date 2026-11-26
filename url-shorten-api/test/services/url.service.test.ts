@@ -16,7 +16,7 @@ function buildService(
     set = async () => "OK",
     logger = { info() {}, warn() {}, error() {} } as unknown as FastifyBaseLogger,
   }: {
-    find?: (filters: { shortUrl?: string; longUrl?: string }) => Promise<UrlRecord | null>;
+    find?: (filters: { shortUrl?: string; longUrl?: string; uid?: string }) => Promise<UrlRecord | null>;
     get?: (key: string) => Promise<unknown>;
     set?: (key: string, value: string, options: { EX: number }) => Promise<unknown>;
     logger?: FastifyBaseLogger;
@@ -26,7 +26,7 @@ function buildService(
     orm: {
       public: {
         Url: {
-          where: (filters: { shortUrl?: string; longUrl?: string }) => ({
+          where: (filters: { shortUrl?: string; longUrl?: string; uid?: string }) => ({
             first: () => find(filters),
           }),
           create,
@@ -157,13 +157,13 @@ test("resolveUrl propagates cache write failures", async (t) => {
   ]);
 });
 
-test("a long URL insert conflict is reported as already existing without retries", async () => {
+test("a long URL + uid insert conflict is reported as already existing without retries", async () => {
   let attempts = 0;
   const service = buildService(async () => {
     attempts++;
     throw Object.assign(new Error("duplicate long URL"), {
       sqlState: "23505",
-      constraint: "Url_longUrl_key",
+      constraint: "Url_longUrl_uid_key",
     });
   });
 
@@ -175,6 +175,12 @@ test("a long URL insert conflict is reported as already existing without retries
 
 test("a short-code collision retries with a different code", async () => {
   const candidates: string[] = [];
+  const warnings: string[] = [];
+  const logger = {
+    info() {},
+    warn(message: string) { warnings.push(message); },
+    error() {},
+  } as unknown as FastifyBaseLogger;
   const service = buildService(async ({ shortUrl }) => {
     candidates.push(shortUrl);
     if (candidates.length === 1) {
@@ -183,12 +189,16 @@ test("a short-code collision retries with a different code", async () => {
         constraint: "Url_pkey",
       });
     }
-  });
+  }, { logger });
 
   const shortUrl = await service.shortenUrl("https://example.com/collision");
   assert.equal(candidates.length, 2);
   assert.notEqual(candidates[0], candidates[1]);
   assert.equal(shortUrl, candidates[1]);
+  assert.deepStrictEqual(warnings, [
+    `Duplicate short URL detected: ${candidates[0]}`,
+    "Retry (1/9)",
+  ]);
 });
 
 test("persistent short-code collisions stop after nine attempts", async () => {

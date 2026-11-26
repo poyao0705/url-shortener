@@ -1,15 +1,15 @@
-import crypto from "crypto";
+import type { FastifyBaseLogger } from "fastify";
+import { nanoid } from "nanoid";
+import type { createClient } from "redis";
 import { errorMessages } from "../constants.ts";
 import type { Database } from "../prisma/db.ts";
-import { createClient } from "redis";
-import type { FastifyBaseLogger } from "fastify";
 
 const SHORT_URL_LENGTH = 6;
 const PER_LENGTH_RETRIES = 3;
 const MAX_RETRIES = PER_LENGTH_RETRIES * 3;
 
 export function generateShortUrl(longUrl: string, length: number): string {
-  const shortUrl = crypto.createHash("md5").update(longUrl).digest("hex").slice(0, length);
+  const shortUrl = nanoid(length);
   return shortUrl;
 }
 
@@ -33,6 +33,9 @@ export class UrlService {
     let totalRetries = 0;
     let shortUrlLength = SHORT_URL_LENGTH;
 
+    // Say that the user id is fetched from the jwt auth token
+    const uid = "example"; // this should be fetched from the auth token in production
+
     // Check if the URL already exists in the database
     const existingUrl = await this.db.orm.public.Url.where({
       longUrl: longUrl,
@@ -42,12 +45,12 @@ export class UrlService {
     }
 
     while (totalRetries < MAX_RETRIES) {
+      const shortUrl = generateShortUrl(`${longUrl}-${retry}`, shortUrlLength);
       try {
-        const shortUrl = generateShortUrl(`${longUrl}-${retry}`, shortUrlLength);
         await this.db.orm.public.Url.create({
           shortUrl: shortUrl,
           longUrl: longUrl,
-          uid: "example",
+          uid: uid,
         });
         return shortUrl;
       } catch (error) {
@@ -60,14 +63,17 @@ export class UrlService {
           this.logger.error({ err: error }, "Unexpected error");
           throw error;
         }
-        if (error.constraint === "Url_longUrl_key") {
+        // The unique constraint error indicates the URL already exists
+        if (error.constraint === "Url_longUrl_uid_key") {
           this.logger.error("URL already exists");
           throw new Error(errorMessages.URL_ALREADY_EXISTS);
         }
+        // The primary key constraint error indicates a duplicate short URL
         if (error.constraint !== "Url_pkey") {
           this.logger.error({ err: error }, "Unexpected error");
           throw error;
         }
+        this.logger.warn(`Duplicate short URL detected: ${shortUrl}`);
         retry++;
         totalRetries++;
         this.logger.warn(`Retry (${totalRetries}/${MAX_RETRIES})`);
@@ -99,7 +105,9 @@ export class UrlService {
     } else {
       // if not found in cache, look up in the database
       this.logger.info("Cache miss, looking up in database");
-      const url = await this.db.orm.public.Url.where({ shortUrl: shortUrl }).first();
+      const url = await this.db.orm.public.Url.where({
+        shortUrl: shortUrl,
+      }).first();
       if (!url) {
         this.logger.error("URL not found");
         throw new Error(errorMessages.URL_NOT_FOUND);

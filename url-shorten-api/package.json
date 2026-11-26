@@ -14,8 +14,8 @@
     "build:ts": "npm run clean && tsc",
     "watch:ts": "tsc -w",
     "dev": "fastify start -w -l info src/app.ts",
-    "worker:dev": "TS_NODE_TRANSPILE_ONLY=1 node --loader ts-node/esm src/worker.ts",
-    "worker": "node dist/worker.js",
+    "worker:dev": "TS_NODE_TRANSPILE_ONLY=1 node --loader ts-node/esm src/workers/shorten.worker.main.ts",
+    "worker": "node dist/workers/shorten.worker.main.js",
     "contract:emit": "prisma contract emit"
   },
   "keywords": [],
@@ -32,6 +32,7 @@
     "fastify": "5.12.8",
     "fastify-cli": "^8.0.3",
     "fastify-plugin": "^6.0.0",
+    "nanoid": "^6.0.2",
     "redis": "^6.3.0",
     "zod": "^4.6.7"
   },
