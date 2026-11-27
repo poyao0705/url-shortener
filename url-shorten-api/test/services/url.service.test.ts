@@ -157,6 +157,53 @@ test("resolveUrl propagates cache write failures", async (t) => {
   ]);
 });
 
+test("shortenUrl rejects an existing longUrl for the same uid without inserting", async (t) => {
+  const longUrl = "https://example.com/existing";
+  const find = t.mock.fn(async () => ({
+    shortUrl: "abc123",
+    longUrl,
+    uid: "example",
+  }));
+  const create = t.mock.fn(async () => undefined);
+  const service = buildService(create, { find });
+
+  await assert.rejects(service.shortenUrl(longUrl), {
+    message: errorMessages.URL_ALREADY_EXISTS,
+  });
+  assert.deepStrictEqual(find.mock.calls.map((call) => call.arguments), [
+    [{ longUrl, uid: "example" }],
+  ]);
+  assert.equal(create.mock.callCount(), 0);
+});
+
+test("shortenUrl scopes the existing-URL lookup by uid so another user's URL does not block shortening", async (t) => {
+  const longUrl = "https://example.com/shared";
+  const existingRecords: UrlRecord[] = [
+    { shortUrl: "other1", longUrl, uid: "other-user" },
+  ];
+  const find = t.mock.fn(
+    async (filters: { shortUrl?: string; longUrl?: string; uid?: string }) =>
+      existingRecords.find(
+        (record) =>
+          (filters.shortUrl === undefined || record.shortUrl === filters.shortUrl) &&
+          (filters.longUrl === undefined || record.longUrl === filters.longUrl) &&
+          (filters.uid === undefined || record.uid === filters.uid),
+      ) ?? null,
+  );
+  const create = t.mock.fn(async (_data: UrlRecord) => undefined);
+  const service = buildService(create, { find });
+
+  const shortUrl = await service.shortenUrl(longUrl);
+
+  assert.deepStrictEqual(find.mock.calls.map((call) => call.arguments), [
+    [{ longUrl, uid: "example" }],
+  ]);
+  assert.equal(create.mock.callCount(), 1);
+  assert.deepStrictEqual(create.mock.calls[0]?.arguments, [
+    { shortUrl, longUrl, uid: "example" },
+  ]);
+});
+
 test("a long URL + uid insert conflict is reported as already existing without retries", async () => {
   let attempts = 0;
   const service = buildService(async () => {

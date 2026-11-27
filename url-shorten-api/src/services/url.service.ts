@@ -39,6 +39,7 @@ export class UrlService {
     // Check if the URL already exists in the database
     const existingUrl = await this.db.orm.public.Url.where({
       longUrl: longUrl,
+      uid: uid,
     }).first();
     if (existingUrl) {
       throw new Error(errorMessages.URL_ALREADY_EXISTS);
