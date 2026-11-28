@@ -15,12 +15,12 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
    * 1. Counter-backed IDs: use a dedicated cache as a unique ID incrementer.
    *    - Drawback: the counter cache is a single point of failure.
    *    - Mitigation: multiple cache instances with concurrency coordination.
-   * 2. Generated codes (selected): random generation was considered; the current
-   *    service hashes the URL and a retry suffix.
-   *    - Trade-offs: codes can collide, and retries can generate different
-   *      candidates for the same URL.
-   *    - Mitigation: retry collisions and increase the code length after
-   *      repeated failed attempts.
+   * 2. Generated codes (selected): random `nanoid` generation starting at 8
+   *    characters (replacing earlier MD5 hashing so different users can shorten
+   *    the same URL independently).
+   *    - Trade-offs: random codes can collide under growth.
+   *    - Mitigation: retry `Url_pkey` collisions and increase length (8 → 9 → 10)
+   *      after repeated failed attempts.
    */
   fastify.post("/shorten", async (request, reply) => {
     try {

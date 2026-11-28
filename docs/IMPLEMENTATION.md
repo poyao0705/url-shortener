@@ -187,6 +187,5 @@ The schema and surrounding code have the following boundaries:
 - `createdAt` is populated by the database.
 - Redirects record `ClickEvent` rows asynchronously via BullMQ, but `Url.usedCount` is not yet incremented and there is no analytics endpoint.
 - On Redis queue outage, failed flushes restore items into `clickBuffer` without a hard memory cap (`shortcut:` comment in [url.service.ts](../url-shorten-api/src/services/url.service.ts)), and a hard crash (`SIGKILL`) can lose clicks buffered in the last 5 seconds before a flush.
-- The [shortening route's JSDoc](../url-shorten-api/src/routes/root.ts) still references the earlier MD5 hashing approach, and three older [service tests](../url-shorten-api/test/services/url.service.test.ts) still expect the removed upfront `SELECT` check and the earlier `6, 7, 8` retry lengths.
 
 Counter-based ID allocation, coordinated multiple counter caches, and database read replicas appear in the JSDoc as alternatives or possible mitigations. They are not part of the committed runtime. Redis's one-hour expiry applies to cached entries, not to the stored links.
