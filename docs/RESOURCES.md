@@ -7,3 +7,4 @@
 - [Awilix Container - Dependency Injection](https://github.com/jeffijoe/awilix)
 - [Zod Documentation](https://zod.dev/)
 - [Fastify Documentation](https://fastify.dev/docs/latest/)
+- [BullMQ Documentation](https://docs.bullmq.io/)
