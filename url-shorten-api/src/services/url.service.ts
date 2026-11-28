@@ -36,15 +36,6 @@ export class UrlService {
     // Say that the user id is fetched from the jwt auth token
     const uid = "example"; // this should be fetched from the auth token in production
 
-    // Check if the URL already exists in the database
-    const existingUrl = await this.db.orm.public.Url.where({
-      longUrl: longUrl,
-      uid: uid,
-    }).first();
-    if (existingUrl) {
-      throw new Error(errorMessages.URL_ALREADY_EXISTS);
-    }
-
     while (totalRetries < MAX_RETRIES) {
       const shortUrl = generateShortUrl(`${longUrl}-${retry}`, shortUrlLength);
       try {
