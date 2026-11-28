@@ -1,6 +1,6 @@
 # Implementation journey
 
-This document records how the URL shortener evolved and which feature decisions reached the codebase. It covers the URL-shortener feature history from `1fffd3a` (25 October 2026) through `eb0108b` (28 November 2026), cross-checked against the route JSDoc, service implementation, database contract, migrations, and tests. Dates follow the commits' Australia/Sydney timezone.
+This document records how the URL shortener evolved and which feature decisions reached the codebase. It covers the URL-shortener feature history from `1fffd3a` (25 October 2026) through `b443ffd` (28 November 2026), cross-checked against the route JSDoc, service implementation, message-queue pipeline, database contract, migrations, and tests. Dates follow the commits' Australia/Sydney timezone.
 
 ## 1. Prove the shorten-and-redirect flow
 
@@ -156,15 +156,37 @@ Commit `eb0108b` removed the upfront `Url.where({ longUrl, uid }).first()` query
 
 Sources: [URL service](../url-shorten-api/src/services/url.service.ts), [schema](../url-shorten-api/src/prisma/contract.prisma), and [migrations](../url-shorten-api/migrations/app/).
 
+## 8. Add click-event storage, stricter URL validation, and the BullMQ pipeline
+
+**28 November 2026 — `c15bda4`, `030b243`, `bc70547`, `fa32fd5`, `f7e4ceb`, `b443ffd`**
+
+### Add the `ClickEvent` model and tighten URL validation
+
+Commit `c15bda4` added the `ClickEvent` table and regenerated the Prisma 8 contracts and migration history. Each event records an auto-incrementing `id`, a `shortUrl` foreign key referencing `Url.shortUrl` (indexed for lookups), a `clickedAt` timestamp (`TimestamptzString` defaulting to `now()`), and an optional `referrer`.
+
+Commit `030b243` tightened `POST /shorten` request validation in [routes](../url-shorten-api/src/routes/root.ts) from `z.string()` to `z.url({ protocol: /^https?$/ })`, rejecting malformed URLs and non-HTTP(S) schemes before persistence or redirection.
+
+### Build the BullMQ click-tracking queue, standalone worker, and tests
+
+To persist click events asynchronously without blocking redirect responses, commits `bc70547`, `fa32fd5`, `f7e4ceb`, and `b443ffd` introduced the message-queue pipeline backed by the dedicated `noeviction` Redis queue instance:
+
+- **Schema and factories (`bc70547`):** [schemas](../url-shorten-api/src/message-queue/schemas.ts) defines `clickBufferItemSchema` (`shortUrl`, ISO-8601 `clickedAt`, optional nullable `referrer`) as the single source of truth; [utils](../url-shorten-api/src/message-queue/utils.ts) adapts `node-redis` via BullMQ's `createNodeRedisClient`; [queues](../url-shorten-api/src/message-queue/queues.ts) exposes `createClickQueue` for the `"clicks"` queue; and [workers](../url-shorten-api/src/message-queue/workers.ts) exposes `createClickProcessor` (validating `{ items }` with Zod, skipping empty or malformed batches, and batch-inserting via `ClickEvent.createAll`) and `createClickWorker`.
+- **Standalone worker entrypoint (`fa32fd5`):** [mq.main.ts](../url-shorten-api/src/message-queue/mq.main.ts) boots the click worker outside the Fastify server with Pino structured logging, `ready`/`failed`/`error` listeners, and idempotent `SIGINT`/`SIGTERM` shutdown (`worker.close()`, `connection.quit()`, `db.close()`). Package scripts `worker` and `worker:dev` now target this entrypoint.
+- **Service buffer scaffold (`f7e4ceb`):** `UrlService` gained an in-memory `clickBuffer` (`ClickBufferItem[]`), `MAX_BUFFER_SIZE = 250`, and a `trackClick` stub ready to be wired into `resolveUrl` and `clickQueue`.
+- **Unit tests (`b443ffd`):** [click-queue tests](../url-shorten-api/test/message-queue/click-queue.test.ts) cover `clickBufferItemSchema`, valid/empty/malformed batch processing in `createClickProcessor`, and `NodeRedisAdapter` connection preservation in `createClickQueue` and `createClickWorker`.
+
+Sources: [message-queue](../url-shorten-api/src/message-queue/), [click-queue tests](../url-shorten-api/test/message-queue/click-queue.test.ts), [routes](../url-shorten-api/src/routes/root.ts), and [schema](../url-shorten-api/src/prisma/contract.prisma).
+
 ## Current implementation boundary
 
-At `eb0108b`, the project implements a persistent shortening and redirect API, single-query `INSERT`-enforced per-user uniqueness, random `nanoid` code generation (starting at 8 characters with bounded collision retries up to length 10), request-shape validation, Redis redirect caching, and application-managed client cleanup.
+At `b443ffd`, the project implements a persistent shortening and redirect API, single-query `INSERT`-enforced per-user uniqueness, random `nanoid` code generation (starting at 8 characters with bounded collision retries up to length 10), HTTP(S) URL validation on shortening, Redis redirect caching, `ClickEvent` storage, a standalone BullMQ click-event worker pipeline with unit tests, and application-managed client cleanup.
 
 The schema and surrounding code have the following boundaries:
 
 - `uid` is still stored as the literal `"example"` during registration; user accounts and JWT extraction are not yet implemented, though the schema enforces uniqueness per `(longUrl, uid)` in preparation for per-user links.
 - `createdAt` is populated by the database.
-- `usedCount` defaults to zero, but redirects do not increment it and there is no usage analytics endpoint.
+- `ClickEvent` persistence and the BullMQ worker pipeline are implemented, but `clickQueue` is not yet registered in [app.ts](../url-shorten-api/src/app.ts) or wired into `UrlService.resolveUrl` / `UrlService.trackClick` (and `usedCount` is not yet incremented on redirects or exposed via an analytics endpoint).
+- `mq.main.ts` reads `QUEUE_REDIS_URL`, which must be set in `.env` before running `npm run worker` / `npm run worker:dev`.
 - The [shortening route's JSDoc](../url-shorten-api/src/routes/root.ts) still references the earlier MD5 hashing approach, and [service tests](../url-shorten-api/test/services/url.service.test.ts) still expect the removed upfront `SELECT` check and the earlier `6, 7, 8` retry lengths.
 
 Counter-based ID allocation, coordinated multiple counter caches, and database read replicas appear in the JSDoc as alternatives or possible mitigations. They are not part of the committed runtime. Redis's one-hour expiry applies to cached entries, not to the stored links.
