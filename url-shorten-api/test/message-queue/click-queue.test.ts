@@ -2,6 +2,7 @@ import * as assert from "node:assert";
 import { test } from "node:test";
 import { Worker, type Job } from "bullmq";
 import type { FastifyBaseLogger } from "fastify";
+import { queueNames } from "../../src/constants.js";
 import { createClickQueue } from "../../src/message-queue/queues.js";
 import { clickBufferItemSchema } from "../../src/message-queue/schemas.js";
 import { createQueueConnection } from "../../src/message-queue/utils.js";
@@ -101,8 +102,8 @@ test("createClickQueue and createClickWorker preserve the NodeRedisAdapter conne
     await queue.close();
   });
 
-  assert.equal(queue.name, "clicks");
-  assert.equal(worker.name, "clicks");
+  assert.equal(queue.name, queueNames.CLICK_QUEUE);
+  assert.equal(worker.name, queueNames.CLICK_QUEUE);
   assert.strictEqual(queue.opts.connection, connection);
   assert.strictEqual(worker.opts.connection, connection);
 });

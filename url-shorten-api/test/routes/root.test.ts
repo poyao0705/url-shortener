@@ -91,9 +91,11 @@ test("concurrent registrations of the same URL return 200 and 409", { timeout: 1
     },
   } as unknown as ReturnType<typeof createClient>;
   const logger = { info() {}, warn() {}, error() {} } as unknown as FastifyBaseLogger;
-  const app = await build(t, {
-    urlService: new UrlService(gatedDatabase, redisClient, logger),
+  const urlService = new UrlService(gatedDatabase, redisClient, logger, {
+    add: async () => undefined,
   });
+  t.after(() => urlService.close());
+  const app = await build(t, { urlService });
   const register = () => app.inject({
     method: "POST",
     url: "/shorten",

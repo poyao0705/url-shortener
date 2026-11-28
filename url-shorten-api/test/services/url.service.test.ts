@@ -3,6 +3,7 @@ import { test } from "node:test";
 import Fastify, { type FastifyBaseLogger } from "fastify";
 import type { createClient } from "redis";
 import { errorMessages } from "../../src/constants.js";
+import type { ClickEventBatch } from "../../src/message-queue/workers.js";
 import type { Database } from "../../src/prisma/db.js";
 import { UrlService } from "../../src/services/url.service.js";
 
@@ -14,11 +15,13 @@ function buildService(
     find = async () => null,
     get = async () => null,
     set = async () => "OK",
+    add = async () => undefined,
     logger = { info() {}, warn() {}, error() {} } as unknown as FastifyBaseLogger,
   }: {
     find?: (filters: { shortUrl?: string; longUrl?: string; uid?: string }) => Promise<UrlRecord | null>;
     get?: (key: string) => Promise<unknown>;
     set?: (key: string, value: string, options: { EX: number }) => Promise<unknown>;
+    add?: (name: string, data: ClickEventBatch) => Promise<unknown>;
     logger?: FastifyBaseLogger;
   } = {},
 ) {
@@ -35,7 +38,7 @@ function buildService(
     },
   } as unknown as Database;
   const redisClient = { get, set } as unknown as ReturnType<typeof createClient>;
-  return new UrlService(database, redisClient, logger);
+  return new UrlService(database, redisClient, logger, { add });
 }
 
 test("resolveUrl returns a cache hit without a database lookup or cache write", async (t) => {
@@ -301,3 +304,85 @@ for (const [name, error] of [
     assert.equal(logs[0]?.err?.stack, error.stack);
   });
 }
+
+test("resolveUrl tracks clicks on hits and flushes them as a single batch job", async (t) => {
+  const add = t.mock.fn(async (_name: string, _data: ClickEventBatch) => undefined);
+  const service = buildService(async () => undefined, {
+    get: async (key) => (key === "cached" ? "https://example.com/cached" : null),
+    find: async (filters) =>
+      filters.shortUrl === "from-db"
+        ? { shortUrl: "from-db", longUrl: "https://example.com/db", uid: "u1" }
+        : null,
+    add,
+  });
+  t.after(() => service.close());
+
+  await service.resolveUrl("cached", "https://ref.test");
+  await service.resolveUrl("from-db");
+  await assert.rejects(service.resolveUrl("missing"), { message: errorMessages.URL_NOT_FOUND });
+
+  assert.equal(add.mock.callCount(), 0);
+  await service.flushClickBuffer();
+
+  assert.equal(add.mock.callCount(), 1);
+  const [jobName, payload] = add.mock.calls[0].arguments;
+  assert.equal(jobName, "click-batch");
+  assert.equal(payload.items.length, 2);
+  assert.equal(payload.items[0].shortUrl, "cached");
+  assert.equal(payload.items[0].referrer, "https://ref.test");
+  assert.equal(payload.items[1].shortUrl, "from-db");
+  assert.equal(payload.items[1].referrer, null);
+});
+
+test("trackClick auto-flushes when buffer reaches 250 items", async (t) => {
+  const add = t.mock.fn(async (_name: string, _data: ClickEventBatch) => undefined);
+  const service = buildService(async () => undefined, { add });
+  t.after(() => service.close());
+
+  for (let i = 0; i < 249; i++) {
+    service.trackClick(`code-${i}`);
+  }
+  assert.equal(add.mock.callCount(), 0);
+
+  service.trackClick("code-249");
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(add.mock.callCount(), 1);
+  assert.equal(add.mock.calls[0].arguments[1].items.length, 250);
+});
+
+test("flushClickBuffer preserves clicks arriving mid-flush and restores on failure", async (t) => {
+  let release!: () => void;
+  let shouldFail = false;
+  const batches: ClickEventBatch[] = [];
+  const add = t.mock.fn(async (_name: string, data: ClickEventBatch) => {
+    if (shouldFail) throw new Error("redis down");
+    if (batches.length === 0) {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+    }
+    batches.push(data);
+  });
+  const service = buildService(async () => undefined, { add });
+  t.after(() => service.close());
+
+  service.trackClick("before-flush");
+  const flushing = service.flushClickBuffer();
+  // Click arrives while the first flush is awaiting Redis.
+  service.trackClick("during-flush");
+  release();
+  await flushing;
+
+  assert.equal(batches.length, 1);
+  assert.deepStrictEqual(batches[0].items.map((item) => item.shortUrl), ["before-flush"]);
+
+  // Failed flush restores items for the next flush.
+  shouldFail = true;
+  await assert.rejects(service.flushClickBuffer(), { message: "redis down" });
+
+  shouldFail = false;
+  await service.flushClickBuffer();
+  assert.equal(batches.length, 2);
+  assert.deepStrictEqual(batches[1].items.map((item) => item.shortUrl), ["during-flush"]);
+});
