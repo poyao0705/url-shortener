@@ -16,7 +16,9 @@
     "dev": "fastify start -w -l info src/app.ts",
     "worker:dev": "TS_NODE_TRANSPILE_ONLY=1 node --loader ts-node/esm src/message-queue/mq.main.ts",
     "worker": "node dist/message-queue/mq.main.js",
-    "contract:emit": "prisma contract emit"
+    "contract:emit": "prisma contract emit",
+    "migration:plan": "prisma migration plan",
+    "db:migrate": "prisma db migrate"
   },
   "keywords": [],
   "author": "",
