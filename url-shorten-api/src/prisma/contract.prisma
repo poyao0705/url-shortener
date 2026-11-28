@@ -29,3 +29,11 @@ model Url {
   usedCount Int @default(0)
   @@unique([longUrl, uid], map: "Url_longUrl_uid_key")
 }
+
+model ClickEvent {
+  id        Int      @id @default(autoincrement())
+  shortUrl  String
+  clickedAt TimestamptzString @default(now())
+  referrer  String?
+  urlRef    Url     @relation(fields: [shortUrl], references: [shortUrl])
+}

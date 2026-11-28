@@ -23,7 +23,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'a9a832343db3c13d1bf7f646341b5a951fba4b388ab52f0d6024df9ef691e92f'>;
+  StorageHashBase<'7e15d7a6120361085ab99fde4294bb7baaadb6fb6f94bea1bb66f4b2b4ebed71'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
@@ -269,6 +269,14 @@ export type StorageColumnInputTypes = ColumnTypesFromStorage<
 >;
 
 export namespace Models {
+  export type public_ClickEvent = {
+    clickedAt: FieldOutputTypes['public']['ClickEvent']['clickedAt'];
+    id: FieldOutputTypes['public']['ClickEvent']['id'];
+    referrer: FieldOutputTypes['public']['ClickEvent']['referrer'];
+    shortUrl: FieldOutputTypes['public']['ClickEvent']['shortUrl'];
+    urlRef: public_Url;
+    readonly [RelationKeys]?: 'urlRef';
+  };
   export type public_Url = {
     createdAt: FieldOutputTypes['public']['Url']['createdAt'];
     longUrl: FieldOutputTypes['public']['Url']['longUrl'];
@@ -281,6 +289,7 @@ export namespace Models {
 
 export declare const models: {
   public: {
+    ClickEvent: Models.public_ClickEvent;
     Url: Models.public_Url;
   };
 };
@@ -303,6 +312,63 @@ type ContractBase = Omit<
         readonly kind: 'postgres-schema';
         readonly entries: {
           readonly table: {
+            readonly ClickEvent: {
+              columns: {
+                readonly clickedAt: {
+                  readonly dataType: 'pg/timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                  readonly many: false;
+                };
+                readonly id: {
+                  readonly dataType: 'pg/int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: 'autoincrement()';
+                  };
+                  readonly many: false;
+                };
+                readonly referrer: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                  readonly many: false;
+                };
+                readonly shortUrl: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [
+                {
+                  readonly name: 'ClickEvent_shortUrl_idx_26a79b9d';
+                  readonly prefix: 'ClickEvent_shortUrl_idx';
+                  readonly columns: readonly ['shortUrl'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'ClickEvent';
+                    readonly columns: readonly ['shortUrl'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Url';
+                    readonly columns: readonly ['shortUrl'];
+                  };
+                },
+              ];
+            };
             readonly Url: {
               columns: {
                 readonly createdAt: {
@@ -362,12 +428,60 @@ type ContractBase = Omit<
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
   readonly roots: {
+    readonly ClickEvent: {
+      readonly namespace: 'public' & NamespaceId;
+      readonly model: 'ClickEvent';
+    };
     readonly Url: { readonly namespace: 'public' & NamespaceId; readonly model: 'Url' };
   };
   readonly domain: {
     readonly namespaces: {
       readonly public: {
         readonly models: {
+          readonly ClickEvent: {
+            readonly fields: {
+              readonly clickedAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                };
+              };
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly referrer: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly shortUrl: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: {
+              readonly urlRef: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Url' };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['shortUrl'];
+                  readonly targetFields: readonly ['shortUrl'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'ClickEvent';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly clickedAt: { readonly column: 'clickedAt' };
+                readonly id: { readonly column: 'id' };
+                readonly referrer: { readonly column: 'referrer' };
+                readonly shortUrl: { readonly column: 'shortUrl' };
+              };
+            };
+          };
           readonly Url: {
             readonly fields: {
               readonly createdAt: {

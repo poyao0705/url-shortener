@@ -4,6 +4,10 @@
   "target": "postgres",
   "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
+    "ClickEvent": {
+      "model": "ClickEvent",
+      "namespace": "public"
+    },
     "Url": {
       "model": "Url",
       "namespace": "public"
@@ -13,6 +17,74 @@
     "namespaces": {
       "public": {
         "models": {
+          "ClickEvent": {
+            "fields": {
+              "clickedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "referrer": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "shortUrl": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "urlRef": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "shortUrl"
+                  ],
+                  "targetFields": [
+                    "shortUrl"
+                  ]
+                },
+                "to": {
+                  "model": "Url",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "clickedAt": {
+                  "column": "clickedAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "referrer": {
+                  "column": "referrer"
+                },
+                "shortUrl": {
+                  "column": "shortUrl"
+                }
+              },
+              "namespaceId": "public",
+              "table": "ClickEvent"
+            }
+          },
           "Url": {
             "fields": {
               "createdAt": {
@@ -83,6 +155,75 @@
       "public": {
         "entries": {
           "table": {
+            "ClickEvent": {
+              "columns": {
+                "clickedAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "dataType": "pg/timestamptz",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "dataType": "pg/int4",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nullable": false
+                },
+                "referrer": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
+                },
+                "shortUrl": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "index": {
+                    "name": "ClickEvent_shortUrl_idx_26a79b9d"
+                  },
+                  "source": {
+                    "columns": [
+                      "shortUrl"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "ClickEvent"
+                  },
+                  "target": {
+                    "columns": [
+                      "shortUrl"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Url"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "shortUrl"
+                  ],
+                  "name": "ClickEvent_shortUrl_idx_26a79b9d",
+                  "prefix": "ClickEvent_shortUrl_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "Url": {
               "columns": {
                 "createdAt": {
@@ -142,7 +283,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "a9a832343db3c13d1bf7f646341b5a951fba4b388ab52f0d6024df9ef691e92f"
+    "storageHash": "7e15d7a6120361085ab99fde4294bb7baaadb6fb6f94bea1bb66f4b2b4ebed71"
   },
   "capabilities": {
     "postgres": {
