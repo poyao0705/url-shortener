@@ -6,6 +6,8 @@ import { asClass, asFunction, asValue, createContainer, InjectionMode } from "aw
 import type { FastifyPluginAsync } from "fastify";
 import { createClient } from "redis";
 import { errorMessages } from "./constants.ts";
+import { createClickQueue } from "./message-queue/queues.ts";
+import { createQueueConnection, getQueueRedisUrl } from "./message-queue/utils.ts";
 import { createDb } from "./prisma/db.ts";
 import { UrlService } from "./services/url.service.ts";
 
@@ -42,9 +44,29 @@ const app: FastifyPluginAsync<AppOptions> = async (fastify, opts): Promise<void>
     })
       .singleton()
       .disposer((client) => client.quit()),
+    queueConnection: asFunction(() => createQueueConnection(getQueueRedisUrl())).singleton(),
+    queue: asFunction((queueConnection: ReturnType<typeof createQueueConnection>) => {
+      const queue = createClickQueue(queueConnection);
+      queue.on("error", (err) => {
+        fastify.log.error({ err }, "Click queue error");
+      });
+      return queue;
+    }).singleton(),
     urlService: opts.urlService
       ? asValue(opts.urlService)
       : asClass(UrlService).singleton(),
+  });
+
+  fastify.addHook("onClose", async () => {
+    if (!opts.urlService && container.cache.has("urlService")) {
+      await container.resolve<UrlService>("urlService").close();
+    }
+    if (container.cache.has("queue")) {
+      await container.resolve<ReturnType<typeof createClickQueue>>("queue").close();
+    }
+    if (container.cache.has("queueConnection")) {
+      await container.resolve<ReturnType<typeof createQueueConnection>>("queueConnection").quit();
+    }
   });
 
   await fastify.register(fastifyAwilixPlugin, {

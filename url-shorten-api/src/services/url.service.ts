@@ -2,13 +2,19 @@ import type { FastifyBaseLogger } from "fastify";
 import { nanoid } from "nanoid";
 import type { createClient } from "redis";
 import { errorMessages } from "../constants.ts";
-import type { Database } from "../prisma/db.ts";
 import type { ClickBufferItem } from "../message-queue/schemas.ts";
+import type { ClickEventBatch } from "../message-queue/workers.ts";
+import type { Database } from "../prisma/db.ts";
+
+export type ClickQueue = {
+  add: (name: string, data: ClickEventBatch) => Promise<unknown>;
+};
 
 const SHORT_URL_LENGTH = 8;
 const PER_LENGTH_RETRIES = 3;
 const MAX_RETRIES = PER_LENGTH_RETRIES * 3;
 const MAX_BUFFER_SIZE = 250;
+const FLUSH_INTERVAL_MS = 5_000;
 
 export function generateShortUrl(longUrl: string, length: number): string {
   const shortUrl = nanoid(length);
@@ -19,17 +25,23 @@ export class UrlService {
   private readonly db: Database;
   private readonly redisClient: ReturnType<typeof createClient>;
   private readonly logger: FastifyBaseLogger;
-  // Click-tracking In-memory buffer
+  private readonly queue: ClickQueue;
   private readonly clickBuffer: Array<ClickBufferItem> = [];
+  private readonly flushTimer: NodeJS.Timeout;
 
   constructor(
     database: Database,
     redisClient: ReturnType<typeof createClient>,
     logger: FastifyBaseLogger,
+    queue: ClickQueue,
   ) {
     this.db = database;
     this.redisClient = redisClient;
     this.logger = logger;
+    this.queue = queue;
+    this.flushTimer = setInterval(() => {
+      void this.flushClickBuffer("timer").catch(() => {});
+    }, FLUSH_INTERVAL_MS).unref();
   }
 
   async shortenUrl(longUrl: string): Promise<string> {
@@ -86,13 +98,14 @@ export class UrlService {
     throw new Error(errorMessages.FAILED_TO_SHORTEN_URL);
   }
 
-  async resolveUrl(shortUrl: string): Promise<string> {
+  async resolveUrl(shortUrl: string, referrer?: string | null): Promise<string> {
     // use node-redis
     const cachedUrl = await this.redisClient.get(shortUrl);
     // look up the URL in the redis cache
     if (cachedUrl) {
       if (typeof cachedUrl === "string") {
         this.logger.info("Cache hit, returning cached URL");
+        this.trackClick(shortUrl, referrer);
         return cachedUrl;
       } else {
         this.logger.error("Invalid cached URL");
@@ -111,9 +124,51 @@ export class UrlService {
       this.logger.info("URL found, caching in redis");
       // cache the URL in redis cache
       await this.redisClient.set(shortUrl, url.longUrl, { EX: 3600 });
+      this.trackClick(shortUrl, referrer);
       return url.longUrl;
     }
   }
 
-  async trackClick(shortUrl: string, referrer?: string | null): Promise<void> {}
+  trackClick(shortUrl: string, referrer?: string | null): void {
+    this.clickBuffer.push({
+      shortUrl,
+      clickedAt: new Date().toISOString(),
+      referrer: referrer ?? null,
+    });
+    this.logger.info(
+      { shortUrl, bufferSize: this.clickBuffer.length },
+      "Buffered click event",
+    );
+    if (this.clickBuffer.length >= MAX_BUFFER_SIZE) {
+      void this.flushClickBuffer("threshold").catch(() => {});
+    }
+  }
+
+  async flushClickBuffer(
+    reason: "threshold" | "timer" | "shutdown" | "manual" = "manual",
+  ): Promise<void> {
+    if (this.clickBuffer.length === 0) return;
+    // Drain synchronously before awaiting so clicks arriving mid-flush are not lost.
+    const items = this.clickBuffer.splice(0);
+    this.logger.info({ count: items.length, reason }, "Flushing click buffer to queue");
+    try {
+      const job = await this.queue.add("click-batch", { items });
+      const jobId =
+        job && typeof job === "object" && "id" in job ? (job as { id?: string }).id : undefined;
+      this.logger.info({ jobId, count: items.length, reason }, "Enqueued click batch");
+    } catch (err) {
+      // shortcut: re-queuing into clickBuffer is unbounded if Redis stays down; add a max cap when scaling
+      this.clickBuffer.unshift(...items);
+      this.logger.error(
+        { err, restoredCount: items.length, reason },
+        "Failed to flush click buffer, restored items",
+      );
+      throw err;
+    }
+  }
+
+  async close(): Promise<void> {
+    clearInterval(this.flushTimer);
+    await this.flushClickBuffer("shutdown");
+  }
 }

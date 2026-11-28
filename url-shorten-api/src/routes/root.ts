@@ -58,8 +58,10 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
   fastify.get("/:shortUrl", async (request, reply) => {
     try {
       const { shortUrl } = z.object({ shortUrl: z.string() }).parse(request.params);
+      const referrer =
+        typeof request.headers.referer === "string" ? request.headers.referer.slice(0, 2048) : null;
       const urlService = request.diScope.resolve<UrlService>("urlService");
-      const url = await urlService.resolveUrl(shortUrl);
+      const url = await urlService.resolveUrl(shortUrl, referrer);
       if (!url) {
         throw new Error(errorMessages.URL_NOT_FOUND);
       }
