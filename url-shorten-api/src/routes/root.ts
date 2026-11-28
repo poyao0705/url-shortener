@@ -24,7 +24,9 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
    */
   fastify.post("/shorten", async (request, reply) => {
     try {
-      const { longUrl } = z.object({ longUrl: z.string() }).parse(request.body);
+      const { longUrl } = z
+        .object({ longUrl: z.url({ protocol: /^https?$/ }) })
+        .parse(request.body);
 
       const urlService = request.diScope.resolve<UrlService>("urlService");
       const shortUrl = await urlService.shortenUrl(longUrl);
