@@ -57,6 +57,14 @@ const app: FastifyPluginAsync<AppOptions> = async (fastify, opts): Promise<void>
       : asClass(UrlService).singleton(),
   });
 
+  await fastify.register(fastifyAwilixPlugin, {
+    container,
+    disposeOnClose: true,
+    disposeOnResponse: true,
+  });
+
+  // Registered after fastifyAwilixPlugin so Fastify's LIFO onClose drains clicks
+  // and closes queue resources before container.dispose() clears container.cache.
   fastify.addHook("onClose", async () => {
     if (!opts.urlService && container.cache.has("urlService")) {
       await container.resolve<UrlService>("urlService").close();
@@ -67,12 +75,6 @@ const app: FastifyPluginAsync<AppOptions> = async (fastify, opts): Promise<void>
     if (container.cache.has("queueConnection")) {
       await container.resolve<ReturnType<typeof createQueueConnection>>("queueConnection").quit();
     }
-  });
-
-  await fastify.register(fastifyAwilixPlugin, {
-    container,
-    disposeOnClose: true,
-    disposeOnResponse: true,
   });
 
   if (!opts.urlService) {
