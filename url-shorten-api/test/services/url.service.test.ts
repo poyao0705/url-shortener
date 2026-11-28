@@ -160,47 +160,17 @@ test("resolveUrl propagates cache write failures", async (t) => {
   ]);
 });
 
-test("shortenUrl rejects an existing longUrl for the same uid without inserting", async (t) => {
-  const longUrl = "https://example.com/existing";
-  const find = t.mock.fn(async () => ({
-    shortUrl: "abc123",
-    longUrl,
-    uid: "example",
-  }));
-  const create = t.mock.fn(async () => undefined);
-  const service = buildService(create, { find });
-
-  await assert.rejects(service.shortenUrl(longUrl), {
-    message: errorMessages.URL_ALREADY_EXISTS,
-  });
-  assert.deepStrictEqual(find.mock.calls.map((call) => call.arguments), [
-    [{ longUrl, uid: "example" }],
-  ]);
-  assert.equal(create.mock.callCount(), 0);
-});
-
-test("shortenUrl scopes the existing-URL lookup by uid so another user's URL does not block shortening", async (t) => {
-  const longUrl = "https://example.com/shared";
-  const existingRecords: UrlRecord[] = [
-    { shortUrl: "other1", longUrl, uid: "other-user" },
-  ];
-  const find = t.mock.fn(
-    async (filters: { shortUrl?: string; longUrl?: string; uid?: string }) =>
-      existingRecords.find(
-        (record) =>
-          (filters.shortUrl === undefined || record.shortUrl === filters.shortUrl) &&
-          (filters.longUrl === undefined || record.longUrl === filters.longUrl) &&
-          (filters.uid === undefined || record.uid === filters.uid),
-      ) ?? null,
-  );
+test("shortenUrl inserts directly with an 8-character code without an upfront SELECT", async (t) => {
+  const longUrl = "https://example.com/direct-insert";
+  const find = t.mock.fn(async () => null);
   const create = t.mock.fn(async (_data: UrlRecord) => undefined);
   const service = buildService(create, { find });
+  t.after(() => service.close());
 
   const shortUrl = await service.shortenUrl(longUrl);
 
-  assert.deepStrictEqual(find.mock.calls.map((call) => call.arguments), [
-    [{ longUrl, uid: "example" }],
-  ]);
+  assert.equal(shortUrl.length, 8);
+  assert.equal(find.mock.callCount(), 0);
   assert.equal(create.mock.callCount(), 1);
   assert.deepStrictEqual(create.mock.calls[0]?.arguments, [
     { shortUrl, longUrl, uid: "example" },
@@ -266,7 +236,7 @@ test("persistent short-code collisions stop after nine attempts", async () => {
   });
   assert.equal(candidates.length, 9);
   assert.deepStrictEqual(candidates.map((candidate) => candidate.length), [
-    6, 6, 6, 7, 7, 7, 8, 8, 8,
+    8, 8, 8, 9, 9, 9, 10, 10, 10,
   ]);
 });
 

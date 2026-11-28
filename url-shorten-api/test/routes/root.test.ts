@@ -20,9 +20,13 @@ test("default root route", async (t) => {
 test("shortens and redirects with the default URL service", async (t) => {
   const app = await build(t);
   const longUrl = `https://example.com/default-service/${randomUUID()}`;
+  let shortUrl: string | undefined;
   t.after(async () => {
     const database = createDb();
     try {
+      if (shortUrl) {
+        await database.orm.public.ClickEvent.where({ shortUrl }).deleteAll();
+      }
       await database.orm.public.Url.where({ longUrl }).delete();
     } finally {
       await database.close();
@@ -38,7 +42,8 @@ test("shortens and redirects with the default URL service", async (t) => {
 
   assert.equal(res.statusCode, 200);
   const { respUrl } = res.json();
-  assert.match(respUrl, /^http:\/\/short\.test\/[A-Za-z0-9_-]{6}$/);
+  assert.match(respUrl, /^http:\/\/short\.test\/[A-Za-z0-9_-]{8}$/);
+  shortUrl = new URL(respUrl).pathname.slice(1);
 
   const redirect = await app.inject({ url: new URL(respUrl).pathname });
   assert.equal(redirect.statusCode, 302);
@@ -59,25 +64,20 @@ test("concurrent registrations of the same URL return 200 and 409", { timeout: 1
 
   let arrivals = 0;
   let release!: () => void;
-  const lookups = new Promise<void>((resolve) => { release = resolve; });
-  // Hold both real lookups until both requests have checked for an existing URL.
+  const inserts = new Promise<void>((resolve) => { release = resolve; });
+  // Hold both inserts so both requests race against the unique constraint together.
   const gatedDatabase = {
     orm: {
       public: {
         Url: {
-          where(filters: { longUrl?: string; shortUrl?: string; uid?: string }) {
-            return {
-              first: async () => {
-                const row = await collection.where(filters).first();
-                if (filters.longUrl === longUrl && arrivals < 2) {
-                  if (++arrivals === 2) release();
-                  await lookups;
-                }
-                return row;
-              },
-            };
+          where: collection.where.bind(collection),
+          create: async (data: { shortUrl: string; longUrl: string; uid: string }) => {
+            if (data.longUrl === longUrl && arrivals < 2) {
+              if (++arrivals === 2) release();
+              await inserts;
+            }
+            return collection.create(data);
           },
-          create: collection.create.bind(collection),
         },
       },
     },
