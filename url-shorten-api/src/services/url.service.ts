@@ -4,7 +4,7 @@ import type { createClient } from "redis";
 import { errorMessages } from "../constants.ts";
 import type { Database } from "../prisma/db.ts";
 
-const SHORT_URL_LENGTH = 6;
+const SHORT_URL_LENGTH = 8;
 const PER_LENGTH_RETRIES = 3;
 const MAX_RETRIES = PER_LENGTH_RETRIES * 3;
 
