@@ -1,6 +1,6 @@
 # Implementation journey
 
-This document records how the URL shortener evolved and which feature decisions reached the codebase. It covers the committed history from `1fffd3a` (25 October 2026) through `9055f2a` (28 October 2026), cross-checked against the route JSDoc, service implementation, database contract, migrations, and tests. Dates follow the commits' Australia/Sydney timezone.
+This document records how the URL shortener evolved and which feature decisions reached the codebase. It covers the URL-shortener feature history from `1fffd3a` (25 October 2026) through `eb0108b` (28 November 2026), cross-checked against the route JSDoc, service implementation, database contract, migrations, and tests. Dates follow the commits' Australia/Sydney timezone.
 
 ## 1. Prove the shorten-and-redirect flow
 
@@ -71,7 +71,7 @@ The persistence implementation introduced retries, and `069cc93` corrected their
 | Duplicate short code, `Url_pkey` | Generate another candidate and retry. |
 | Other constraint or database failure | Propagate the error without treating it as a collision. |
 
-The final generation sequence hashes `${longUrl}-${retry}` and takes a hexadecimal prefix. It tries three candidates at each length: six characters, then seven, then eight. The suffix counter resets when the length increases. Nine failed insert attempts produce `Failed to shorten URL`, which the route exposes as a generic `500` response.
+That generation sequence hashed `${longUrl}-${retry}` and took a hexadecimal prefix. It tried three candidates at each length: six characters, then seven, then eight. The suffix counter reset when the length increased. Nine failed insert attempts produce `Failed to shorten URL`, which the route exposes as a generic `500` response.
 
 Error messages were centralized in [constants](../url-shorten-api/src/constants.ts). The resulting API behavior is:
 
@@ -125,16 +125,46 @@ Tests evolved alongside the service extraction, persistence changes, collision f
 - The same service tests cover cache hits, misses and empty entries, the one-hour expiry, reuse of populated entries, missing mappings, invalid cached values, and Redis/database failure propagation.
 - [Database lifecycle tests](../url-shorten-api/test/plugins/database.test.ts) check that application instances own separate database clients and close only their own client, including when another application uses an injected service.
 
-The final reviewed commit, `9055f2a`, expanded cache coverage and added the concurrent registration case.
+The final reviewed commit of this phase, `9055f2a`, expanded cache coverage and added the concurrent registration case.
+
+## 7. Scope uniqueness per user, switch to `nanoid`, and streamline writes
+
+**26–28 November 2026 — `08a99ac`, `458c9dd`, `dfc9d09`, `eb0108b`**
+
+### Allow different users to shorten the same URL
+
+Commit `08a99ac` replaced the global `@unique` constraint on `longUrl` with a composite unique constraint on `(longUrl, uid)`, pinned to the constraint name `Url_longUrl_uid_key` in the schema and migrations. Different users can now create independent short codes for the same destination URL, while a duplicate `(longUrl, uid)` pair still returns `409` with `URL already exists`.
+
+`UrlService` updated its PostgreSQL unique-constraint check from `Url_longUrl_key` to `Url_longUrl_uid_key`. Commit `458c9dd` also scoped the pre-insert lookup by `uid` before that lookup was removed the next day.
+
+### Replace MD5 hashing with `nanoid` and raise starting length
+
+Because different users can now shorten the same `longUrl`, deterministic MD5 hashing of `longUrl` would collide across users on the first attempt. Commit `08a99ac` replaced MD5 prefix hashing in `generateShortUrl` with random `nanoid(length)` generation while keeping the bounded retry loop for `Url_pkey` collisions.
+
+Commit `dfc9d09` raised the starting `SHORT_URL_LENGTH` from `6` to `8` characters to avoid early collisions as the table grows. With three retries per length and nine total attempts, code generation now tries lengths `8, 8, 8, 9, 9, 9, 10, 10, 10` before failing with `Failed to shorten URL`.
+
+### Remove the redundant pre-insert `SELECT`
+
+Commit `eb0108b` removed the upfront `Url.where({ longUrl, uid }).first()` query from `shortenUrl`. PostgreSQL's `Url_longUrl_uid_key` constraint already enforces duplicate detection atomically during `INSERT`:
+
+| Insert outcome | Current behavior |
+| --- | --- |
+| New `(longUrl, uid)` | Succeeds in a single `INSERT` query (down from `SELECT` + `INSERT`). |
+| Duplicate `(longUrl, uid)`, `Url_longUrl_uid_key` | Caught immediately and reported as `409` (`URL already exists`); no retry. |
+| Duplicate short code, `Url_pkey` | Retries with a newly generated `nanoid`, escalating length `8 → 9 → 10`. |
+| Other constraint or database failure | Logged and propagated as `500`. |
+
+Sources: [URL service](../url-shorten-api/src/services/url.service.ts), [schema](../url-shorten-api/src/prisma/contract.prisma), and [migrations](../url-shorten-api/migrations/app/).
 
 ## Current implementation boundary
 
-At `9055f2a`, the project implements a persistent shortening and redirect API, database-enforced uniqueness, bounded collision handling, request-shape validation, Redis caching, and application-managed client cleanup.
+At `eb0108b`, the project implements a persistent shortening and redirect API, single-query `INSERT`-enforced per-user uniqueness, random `nanoid` code generation (starting at 8 characters with bounded collision retries up to length 10), request-shape validation, Redis redirect caching, and application-managed client cleanup.
 
-The schema stores metadata with the following behavior:
+The schema and surrounding code have the following boundaries:
 
-- `uid` is stored as the literal `"example"` during registration; user accounts and ownership enforcement are not implemented.
+- `uid` is still stored as the literal `"example"` during registration; user accounts and JWT extraction are not yet implemented, though the schema enforces uniqueness per `(longUrl, uid)` in preparation for per-user links.
 - `createdAt` is populated by the database.
 - `usedCount` defaults to zero, but redirects do not increment it and there is no usage analytics endpoint.
+- The [shortening route's JSDoc](../url-shorten-api/src/routes/root.ts) still references the earlier MD5 hashing approach, and [service tests](../url-shorten-api/test/services/url.service.test.ts) still expect the removed upfront `SELECT` check and the earlier `6, 7, 8` retry lengths.
 
 Counter-based ID allocation, coordinated multiple counter caches, and database read replicas appear in the JSDoc as alternatives or possible mitigations. They are not part of the committed runtime. Redis's one-hour expiry applies to cached entries, not to the stored links.
