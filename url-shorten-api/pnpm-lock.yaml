@@ -41,6 +41,9 @@ importers:
       nanoid:
         specifier: ^6.0.2
         version: 6.0.2
+      pino:
+        specifier: ^10.4.0
+        version: 10.4.0
       redis:
         specifier: ^6.3.0
         version: 6.3.0
