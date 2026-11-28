@@ -3,6 +3,7 @@ import type { FastifyBaseLogger } from "fastify";
 import { z } from "zod";
 import type { Database } from "../prisma/db.ts";
 import { clickBufferItemSchema, type ClickBufferItem } from "./schemas.ts";
+import { queueNames } from "../constants.ts";
 
 export type ClickEventBatch = {
   items: ClickBufferItem[];
@@ -17,15 +18,16 @@ export function createClickProcessor(database: Database, logger: FastifyBaseLogg
     logger.info({ jobId: job.id }, "Processing click event batch");
     const parsed = clickEventBatchSchema.safeParse(job.data);
     if (!parsed.success) {
-      logger.error(
-        { jobId: job.id, error: parsed.error },
-        "Failed to process click event batch",
-      );
+      logger.error({ jobId: job.id, error: parsed.error }, "Failed to process click event batch");
       return;
     }
-    if (parsed.data.items.length === 0) return;
+    if (parsed.data.items.length === 0) {
+      logger.info({ jobId: job.id }, "Skipping empty click event batch");
+      return;
+    }
 
     await database.orm.public.ClickEvent.createAll(parsed.data.items);
+    logger.info({ jobId: job.id, count: parsed.data.items.length }, "Persisted click event batch");
   };
 }
 
@@ -34,7 +36,7 @@ export function createClickWorker(
   database: Database,
   logger: FastifyBaseLogger,
 ) {
-  return new Worker("clicks", createClickProcessor(database, logger), {
+  return new Worker(queueNames.CLICK_QUEUE, createClickProcessor(database, logger), {
     connection,
   });
 }

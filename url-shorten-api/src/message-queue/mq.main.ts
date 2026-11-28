@@ -1,21 +1,19 @@
 import "dotenv/config";
 import pino from "pino";
 import { createDb } from "../prisma/db.ts";
-import { createQueueConnection } from "./utils.ts";
+import { createQueueConnection, getQueueRedisUrl } from "./utils.ts";
 import { createClickWorker } from "./workers.ts";
 
 const logger = pino({ level: process.env.LOG_LEVEL ?? "info" });
 
-const queueRedisUrl = process.env.QUEUE_REDIS_URL;
-if (!queueRedisUrl) {
-  throw new Error("QUEUE_REDIS_URL is not set");
-}
-
 const db = createDb();
-const connection = createQueueConnection(queueRedisUrl);
+const connection = createQueueConnection(getQueueRedisUrl());
 const worker = createClickWorker(connection, db, logger);
 
 worker.on("ready", () => logger.info("Click worker ready"));
+worker.on("completed", (job) => {
+  logger.info({ jobId: job.id, name: job.name }, "Click job completed");
+});
 worker.on("failed", (job, err) => {
   logger.error({ jobId: job?.id, err }, "Click job failed");
 });

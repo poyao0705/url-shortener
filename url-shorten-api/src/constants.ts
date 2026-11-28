@@ -7,3 +7,7 @@ export const errorMessages = {
   REDIS_URL_NOT_SET: "REDIS_URL not set",
   INVALID_CACHED_URL: "Invalid cached URL",
 };
+
+export const queueNames = {
+  CLICK_QUEUE: "click-queue",
+};
